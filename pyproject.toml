@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "datamosh"
+version = "0.1.0"
+description = "Shot-based datamoshing toolkit: core library, CLI, recipes, and a Gradio UI"
+requires-python = ">=3.10"
+dependencies = ["gradio"]
+
+[tool.setuptools]
+packages = ["datamosh"]

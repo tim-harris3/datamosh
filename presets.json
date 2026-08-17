@@ -1,0 +1,509 @@
+{
+  "baseline (calm)": {
+    "n": 10,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.25,
+    "short_gop_bias": 1.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      2,
+      6
+    ],
+    "dup_count_range": [
+      2,
+      10
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "clean bloom": {
+    "n": 10,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.15,
+    "short_gop_bias": 1.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      1,
+      3
+    ],
+    "dup_count_range": [
+      2,
+      8
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "classic transition": {
+    "n": 10,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.85,
+    "short_gop_bias": 1.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      2,
+      6
+    ],
+    "dup_count_range": [
+      3,
+      12
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "heavy bloom": {
+    "n": 8,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.4,
+    "short_gop_bias": 1.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      5,
+      15
+    ],
+    "dup_count_range": [
+      15,
+      60
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "motion transplant": {
+    "n": 12,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.3,
+    "short_gop_bias": 1.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0.85,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      2,
+      6
+    ],
+    "dup_count_range": [
+      2,
+      10
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "reverse bounce": {
+    "n": 10,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.2,
+    "short_gop_bias": 1.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0.6,
+    "video_bounce_prob": 0.6,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      2,
+      6
+    ],
+    "dup_count_range": [
+      2,
+      8
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "shuffle skip": {
+    "n": 10,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.25,
+    "short_gop_bias": 1.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0.7,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0.5,
+    "video_skip_frac": 0.3,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      2,
+      6
+    ],
+    "dup_count_range": [
+      2,
+      8
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "video databend": {
+    "n": 10,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.3,
+    "short_gop_bias": 1.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0.7,
+    "video_databend_frac": 0.3,
+    "dup_frames_range": [
+      2,
+      6
+    ],
+    "dup_count_range": [
+      2,
+      10
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      2,
+      12
+    ]
+  },
+  "audio mangle": {
+    "n": 10,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.2,
+    "short_gop_bias": 1.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0.5,
+    "audio_scramble_prob": 0.6,
+    "audio_databend_prob": 0.6,
+    "audio_databend_frac": 0.4,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      2,
+      6
+    ],
+    "dup_count_range": [
+      3,
+      12
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "escalating": {
+    "n": 16,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.35,
+    "short_gop_bias": 1.0,
+    "escalate": 3.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      2,
+      8
+    ],
+    "dup_count_range": [
+      2,
+      20
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "rapid stutter": {
+    "n": 16,
+    "min_shot": 0.1,
+    "keyframe_delete_prob": 0.3,
+    "short_gop_bias": 3.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      8,
+      20
+    ],
+    "dup_count_range": [
+      2,
+      6
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "long uniform": {
+    "n": 8,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.5,
+    "short_gop_bias": 0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0,
+    "audio_scramble_prob": 0,
+    "audio_databend_prob": 0,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0,
+    "video_shuffle_prob": 0,
+    "video_reverse_prob": 0,
+    "video_bounce_prob": 0,
+    "video_skip_prob": 0,
+    "video_skip_frac": 0.2,
+    "video_databend_prob": 0,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      2,
+      5
+    ],
+    "dup_count_range": [
+      2,
+      10
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  },
+  "everything max": {
+    "n": 14,
+    "min_shot": 0.2,
+    "keyframe_delete_prob": 0.6,
+    "short_gop_bias": 1.0,
+    "escalate": 0.0,
+    "audio_reverse_prob": 0.4,
+    "audio_scramble_prob": 0.4,
+    "audio_databend_prob": 0.4,
+    "audio_databend_frac": 0.2,
+    "video_transplant_prob": 0.5,
+    "video_shuffle_prob": 0.4,
+    "video_reverse_prob": 0.4,
+    "video_bounce_prob": 0.4,
+    "video_skip_prob": 0.4,
+    "video_skip_frac": 0.25,
+    "video_databend_prob": 0.4,
+    "video_databend_frac": 0.2,
+    "dup_frames_range": [
+      4,
+      12
+    ],
+    "dup_count_range": [
+      5,
+      30
+    ],
+    "audio_scramble_window": [
+      4,
+      40
+    ],
+    "audio_databend_bytes": [
+      1,
+      8
+    ],
+    "video_databend_bytes": [
+      1,
+      6
+    ]
+  }
+}

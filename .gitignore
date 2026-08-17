@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+media/
+output/
+8-14/
+them jawns clips/
+*.flac
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.wav
+*.log
