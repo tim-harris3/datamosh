@@ -23,10 +23,12 @@ def run_mosh(cfg=None, *, shots=None, sequence=None, progress=None):
     cfg      -- a MoshConfig; None uses all defaults.
     shots    -- optional [(t0, t1), ...] list used as the shot map instead of running
                 scene detection on the source (see sections.keyframe_shots).
-    sequence -- optional ordered [(t0, t1), ...]; when given, clips render in exactly
-                this order (duplicates allowed) and cfg.n, shot weights, and scene
-                detection are all bypassed. cfg.seed still makes the effect
-                randomness reproducible.
+    sequence -- optional ordered [(t0, t1), ...] or [(source, t0, t1), ...]; when
+                given, clips render in exactly this order (duplicates allowed) and
+                cfg.n, shot weights, and scene detection are all bypassed. A 3-tuple
+                overrides the clip's source file, so one timeline can splice sections
+                from several videos; 2-tuples use cfg.source. cfg.seed still makes
+                the effect randomness reproducible.
     progress -- optional progress(frac, msg) callback for a UI progress bar.
     """
     cfg = cfg if cfg is not None else MoshConfig()
@@ -38,13 +40,18 @@ def run_mosh(cfg=None, *, shots=None, sequence=None, progress=None):
     output = paths.resolve(cfg.output)
     if not os.path.exists(source):
         raise RuntimeError(f"source not found: {source}")
-    av_ratio = audio_video_ratio(source)
+    av_ratios = {source: audio_video_ratio(source)}
     if sequence is not None:
         if not sequence:
             raise RuntimeError("empty sequence")
+        sequence = [e if len(e) == 3 else (source, e[0], e[1]) for e in sequence]
+        sequence = [(paths.resolve(s), t0, t1) for s, t0, t1 in sequence]
+        for s in {s for s, _, _ in sequence}:
+            if not os.path.exists(s):
+                raise RuntimeError(f"sequence source not found: {s}")
         total, weights = len(sequence), None
-        print(f"source {os.path.basename(source)}: sequence mode, "
-              f"{total} sections (user timeline)")
+        n_src = len({s for s, _, _ in sequence})
+        print(f"sequence mode: {total} sections from {n_src} source(s) (user timeline)")
     else:
         total = cfg.n
         if shots is None:
@@ -79,12 +86,13 @@ def run_mosh(cfg=None, *, shots=None, sequence=None, progress=None):
 
     for it in range(total):
         if sequence is not None:
-            t0, t1 = sequence[it]
+            clip_src, t0, t1 = sequence[it]
         else:
+            clip_src = source
             t0, t1 = random.choices(shots, weights=weights, k=1)[0]
         dur = t1 - t0
         try:
-            extract_shot(source, t0, dur, temp)
+            extract_shot(clip_src, t0, dur, temp)
             _, _, seg = parse_avi(temp)
         except (subprocess.CalledProcessError, ValueError) as e:
             print(f"[{it}] extract {t0:.1f}s failed ({e}); skipped")
@@ -97,9 +105,11 @@ def run_mosh(cfg=None, *, shots=None, sequence=None, progress=None):
 
         keep = len(out_chunks) == 0  # first-ever frames need a valid start
         intensity = 1 + cfg.escalate * (it / max(1, total - 1)) if cfg.escalate else 1.0
+        if clip_src not in av_ratios:
+            av_ratios[clip_src] = audio_video_ratio(clip_src)
         moshed, prev_pframes = mosh_segment(
             cfg, seg, keep_keyframe=keep, donor_pframes=prev_pframes,
-            intensity=intensity, av_ratio=av_ratio,
+            intensity=intensity, av_ratio=av_ratios[clip_src],
         )
 
         vin = sum(1 for c in seg if c["stream"] == "v")
