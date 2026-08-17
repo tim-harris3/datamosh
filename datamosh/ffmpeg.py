@@ -85,6 +85,49 @@ def keyframe_times(path):
     return sorted(times)
 
 
+def keyframe_thumbnails(path, out_dir, width=160, cap=400):
+    """Write one JPEG per video keyframe to out_dir (0001.jpg, 0002.jpg, ...) in
+    keyframe_times() order, so thumbnail N previews the Nth keyframe section.
+    Returns the sorted list of written paths, at most `cap` of them.
+
+    Single decode pass with `-skip_frame nokey`; if the decoder's keyframe count
+    disagrees with the container's packet flags (open-GOP / odd containers), falls
+    back to exact per-timestamp fast-seek extraction.
+    """
+    path = paths.resolve(path)
+    os.makedirs(out_dir, exist_ok=True)
+    for f in os.listdir(out_dir):
+        if f.endswith(".jpg"):
+            os.remove(os.path.join(out_dir, f))
+    times = keyframe_times(path)
+    expected = min(len(times), cap)
+    subprocess.run(
+        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+         "-skip_frame", "nokey", "-i", path, "-vf", f"scale={width}:-2",
+         "-fps_mode", "vfr", "-frames:v", str(cap), "-q:v", "5",
+         os.path.join(out_dir, "%04d.jpg")],
+        check=True,
+    )
+    written = sorted(
+        os.path.join(out_dir, f) for f in os.listdir(out_dir) if f.endswith(".jpg")
+    )
+    if len(written) != expected:
+        for f in written:
+            os.remove(f)
+        for i, t in enumerate(times[:cap]):
+            subprocess.run(
+                ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                 "-ss", f"{t:.3f}", "-i", path, "-frames:v", "1",
+                 "-vf", f"scale={width}:-2", "-q:v", "5",
+                 os.path.join(out_dir, f"{i + 1:04d}.jpg")],
+                check=True,
+            )
+        written = sorted(
+            os.path.join(out_dir, f) for f in os.listdir(out_dir) if f.endswith(".jpg")
+        )
+    return written
+
+
 def fixup(path):
     """Write a more broadly-seekable *_fixed.avi copy via `ffmpeg -c copy`.
 
