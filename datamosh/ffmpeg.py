@@ -47,7 +47,8 @@ def dimensions(path):
     """(width, height) of the first video stream."""
     out = _probe(["-select_streams", "v:0", "-show_entries", "stream=width,height",
                   "-of", "csv=p=0:s=x", path])
-    w, h = out.split("x")
+    # streams with side data (e.g. iPhone rotation) get a trailing separator
+    w, h = [v for v in out.splitlines()[0].split("x") if v]
     return int(w), int(h)
 
 
@@ -55,7 +56,7 @@ def frame_rate(path):
     """Average video frame rate (frames per second)."""
     fr = _probe(["-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate",
                  "-of", "csv=p=0", path])
-    num, den = fr.split("/")
+    num, den = fr.splitlines()[0].strip(",").split("/")
     return float(num) / float(den)
 
 
