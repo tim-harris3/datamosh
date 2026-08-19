@@ -49,7 +49,8 @@ works from anywhere and edits to the package take effect immediately.)
 datamosh/       the core package (parsing, effects, scene maps, pipeline, config)
 recipes/        copy-and-tweak example scripts
 docs/           deeper docs: how the core works, how to write recipes
-app.py          the Gradio browser UI
+app.py          the Gradio browser UI entry point (implementation in ui/)
+ui/             the UI package: config bridge, media browsing, render, layout
 mosh.py         the command-line front end
 presets.json    named settings bundles (used by the UI and --preset)
 media/          put source videos here

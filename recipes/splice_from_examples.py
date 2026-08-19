@@ -16,18 +16,29 @@ Copy, rename, change the numbers, run:
 
 import random
 
-from datamosh import (MoshConfig, delete_tagged_keyframes, example_section_pool,
-                      ffmpeg, keyframe_shots, make_moshable, mosh_pass, parse_avi,
-                      audio_video_ratio, replace_sections, run_mosh, write_avi)
+from datamosh import (
+    MoshConfig,
+    delete_tagged_keyframes,
+    example_section_pool,
+    ffmpeg,
+    keyframe_shots,
+    make_moshable,
+    mosh_pass,
+    parse_avi,
+    audio_video_ratio,
+    replace_sections,
+    run_mosh,
+    write_avi,
+)
 
-SOURCE = "media/truck.AVI"               # footage to mosh
-EXAMPLES = "media/[AS] examples"         # folder of AVIs to steal sections from
+SOURCE = "media/truck.AVI"  # footage to mosh
+EXAMPLES = "media/[AS] examples"  # folder of AVIs to steal sections from
 OUTPUT = "output/truck_moshed.avi"
-SEED = 5                                 # same seed = same result
-KEYFRAME_GAP = (0.2, 10.0)               # random seconds between forced keyframes
-N_SECTIONS = 10                          # sections moshed and appended in pass 1
-REPLACE_PROB = 0.25                      # chance each section is swapped for example material
-SPLICED_KEYFRAME_DELETE = 0.75           # fraction of spliced keyframes deleted after the swap
+SEED = 5  # same seed = same result
+KEYFRAME_GAP = (0.2, 10.0)  # random seconds between forced keyframes
+N_SECTIONS = 10  # sections moshed and appended in pass 1
+REPLACE_PROB = 0.25  # chance each section is swapped for example material
+SPLICED_KEYFRAME_DELETE = 0.75  # fraction of spliced keyframes deleted after the swap
 
 random.seed(SEED)
 
@@ -35,8 +46,13 @@ random.seed(SEED)
 moshable = make_moshable(SOURCE, "output/truck_moshable.avi", gap_range=KEYFRAME_GAP)
 
 # 2. mosh pass 1, keyframe sections as the shot map
-cfg = MoshConfig(source=moshable, output="output/truck_pass1.avi",
-                 n=N_SECTIONS, reset=True, fixup=False)
+cfg = MoshConfig(
+    source=moshable,
+    output="output/truck_pass1.avi",
+    n=N_SECTIONS,
+    reset=True,
+    fixup=False,
+)
 run_mosh(cfg, shots=keyframe_shots(moshable))
 header, movi_start, chunks = parse_avi(cfg.output)
 

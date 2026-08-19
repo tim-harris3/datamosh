@@ -21,26 +21,29 @@ Copy, rename, change the numbers, run:
 
 from datamosh import extract_shot, pixel_sort
 
-SOURCE = "output/8-14_moshable/mvi_0156.avi"  # footage to sample from
-CLIP = "output/pixelsort_clip.avi"       # the shared demo clip every method sorts
-T0, DUR = 12.0, 8.0                      # where to cut the clip (seconds), how long
-SEED = 5                                 # same seed = same result
-LO, HI = 64, 192                         # luma bounds for threshold/bright/dark
-                                         #   (fine for daylight footage; on dark material
-                                         #    drop them -- e.g. 40/170 for media/truck.AVI)
+SOURCE = "media/sample.avi"  # footage to sample from (generate with: python -m datamosh.sample)
+CLIP = "output/pixelsort_clip.avi"  # the shared demo clip every method sorts
+T0, DUR = 12.0, 8.0  # where to cut the clip (seconds), how long
+SEED = 5  # same seed = same result
+LO, HI = 64, 192  # luma bounds for threshold/bright/dark
+#   (fine for daylight footage; on dark material
+#    drop them -- e.g. 40/170)
 
 # one entry per render: (name, pixel_sort keyword overrides)
 DEMOS = [
-    ("threshold", dict(mode="threshold")),                  # midtone streaks, the classic
-    ("bright",    dict(mode="bright")),                     # highlights smear (lights, signs)
-    ("dark",      dict(mode="dark")),                       # shadows smear (heavy at night)
-    ("bands",     dict(mode="bands", band_range=(8, 120))), # venetian-blind melt
-    ("full",      dict(mode="full")),                       # whole rows, total abstraction
-    ("hue_v",     dict(mode="threshold", key="hue", direction="v")),  # colour-ordered, vertical
-    ("chaos",     dict(mode="random", key="random", direction="random", frac=0.4)),
+    ("threshold", dict(mode="threshold")),  # midtone streaks, the classic
+    ("bright", dict(mode="bright")),  # highlights smear (lights, signs)
+    ("dark", dict(mode="dark")),  # shadows smear (heavy at night)
+    ("bands", dict(mode="bands", band_range=(8, 120))),  # venetian-blind melt
+    ("full", dict(mode="full")),  # whole rows, total abstraction
+    (
+        "hue_v",
+        dict(mode="threshold", key="hue", direction="v"),
+    ),  # colour-ordered, vertical
+    ("chaos", dict(mode="random", key="random", direction="random", frac=0.4)),
 ]
 
-extract_shot(SOURCE, T0, DUR, CLIP)      # single-keyframe cut, same shape run_mosh uses
+extract_shot(SOURCE, T0, DUR, CLIP)  # single-keyframe cut, same shape run_mosh uses
 
 for name, overrides in DEMOS:
     kwargs = dict(frac=1.0, lo=LO, hi=HI, seed=SEED)

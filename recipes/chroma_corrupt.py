@@ -15,12 +15,12 @@ Copy, rename, change the numbers, run:
 from datamosh import chroma_databend
 
 chroma_databend(
-    "media/truck.AVI",                   # source video
-    "output/truck_chroma.avi",           # output
-    mode="random",                       # one of the modes above, or "random"
-    planes="uv",                         # which colour planes to touch: "u", "v", or "uv"
-    frac=0.30,                           # fraction of frames corrupted (rest pass clean)
-    seed=5,                              # same seed = same result
+    "media/truck.AVI",  # source video
+    "output/truck_chroma.avi",  # output
+    mode="random",  # one of the modes above, or "random"
+    planes="uv",  # which colour planes to touch: "u", "v", or "uv"
+    frac=0.30,  # fraction of frames corrupted (rest pass clean)
+    seed=5,  # same seed = same result
 )
 
 # Want to mosh the result too? Un-comment:

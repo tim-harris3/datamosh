@@ -28,7 +28,7 @@ Every function used below is importable straight from the package root:
 from datamosh import MoshConfig, run_mosh
 
 cfg = MoshConfig(
-    source="media/[z303-as043] Adult Swim 10.30.05.mkv",
+    source="media/sample.avi",
     output="output/my_mosh.avi",
     n=8,                        # glitch segments appended per run
     seed=7,                     # same seed = same result; change to reroll
