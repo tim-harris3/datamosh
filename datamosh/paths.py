@@ -2,7 +2,7 @@
 project can be moved or copied without editing any paths.
 
 Any datamosh function that takes a file path accepts either an absolute path or a
-path relative to the project root (e.g. "media/truck.AVI"), regardless of the
+path relative to the project root (e.g. "media/sample.avi"), regardless of the
 directory you run your script from -- resolve() is what makes that work.
 """
 

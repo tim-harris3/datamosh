@@ -17,8 +17,8 @@ the final mp4.
 Clips keep their native resolution: the conform target is the most common
 resolution/fps among the folder's clips; only mismatched clips are letterboxed.
 
-Run:
-    .venv\\Scripts\\python recipes\\beat_mosh.py <clips_folder> <song> <bpm> [out.mp4]
+Run (venv active):
+    python recipes/beat_mosh.py <clips_folder> <song> <bpm> [out.mp4]
 """
 
 import os

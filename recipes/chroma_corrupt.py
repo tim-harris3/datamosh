@@ -9,14 +9,14 @@ Modes: "databend" (digital speckle), "shift" (diagonal colour bleed),
 "swap" (exchange U and V), or "random" (fresh mode per corrupted frame).
 
 Copy, rename, change the numbers, run:
-    .venv\\Scripts\\python recipes\\your_copy.py
+    python recipes/your_copy.py    (venv active)
 """
 
 from datamosh import chroma_databend
 
 chroma_databend(
-    "media/truck.AVI",  # source video
-    "output/truck_chroma.avi",  # output
+    "media/sample.avi",  # source video (generate with: python -m datamosh.sample)
+    "output/chroma_corrupt.avi",  # output
     mode="random",  # one of the modes above, or "random"
     planes="uv",  # which colour planes to touch: "u", "v", or "uv"
     frac=0.30,  # fraction of frames corrupted (rest pass clean)
@@ -25,5 +25,5 @@ chroma_databend(
 
 # Want to mosh the result too? Un-comment:
 # from datamosh import MoshConfig, run_mosh
-# run_mosh(MoshConfig(source="output/truck_chroma.avi",
-#                     output="output/truck_chroma_moshed.avi", n=8, seed=5))
+# run_mosh(MoshConfig(source="output/chroma_corrupt.avi",
+#                     output="output/chroma_corrupt_moshed.avi", n=8, seed=5))

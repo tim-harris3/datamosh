@@ -16,7 +16,7 @@ can flip through output/pixelsort_*.avi and compare like-for-like. frac=1.0 keep
 the effect on every frame while you compare; drop it for the in-and-out flicker.
 
 Copy, rename, change the numbers, run:
-    .venv\\Scripts\\python recipes\\your_copy.py
+    python recipes/your_copy.py    (venv active)
 """
 
 from datamosh import extract_shot, pixel_sort

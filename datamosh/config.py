@@ -9,7 +9,7 @@ it everywhere.
 Typical use in a recipe:
 
     from datamosh import MoshConfig, run_mosh
-    cfg = MoshConfig(source="media/truck.AVI", output="output/mine.avi",
+    cfg = MoshConfig(source="media/sample.avi", output="output/mine.avi",
                      n=12, seed=7, keyframe_delete_prob=0.8)
     run_mosh(cfg)
 """

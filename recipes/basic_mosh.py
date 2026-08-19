@@ -1,7 +1,7 @@
 """The minimal mosh: pick a source, set a few knobs, render.
 
 Copy this file, rename it, change the numbers, then run it from the project folder:
-    .venv\\Scripts\\python recipes\\your_copy.py
+    python recipes/your_copy.py    (venv active)
 
 Works best on sources with real scene cuts (shows, edits, trailers). Continuous
 footage with no cuts reads as ONE giant shot, so every segment moshes the whole

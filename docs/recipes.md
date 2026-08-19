@@ -4,8 +4,8 @@ A recipe is a small Python script in [recipes/](../recipes/) that imports from t
 `datamosh` package and renders something. The workflow is always copy → rename →
 change the numbers → run:
 
-```
-.venv\Scripts\python recipes\my_recipe.py
+```sh
+python recipes/my_recipe.py     # from the project folder, venv active
 ```
 
 This guide goes from the one-config recipe up to full multi-pass chunk surgery.
@@ -43,8 +43,8 @@ That's [recipes/basic_mosh.py](../recipes/basic_mosh.py).
 knob listed and commented — copy it when you want to see all the dials at once.
 To print every tunable with its bounds and help text:
 
-```
-.venv\Scripts\python -c "import datamosh; datamosh.describe()"
+```sh
+python -c "import datamosh; datamosh.describe()"
 ```
 
 Things worth knowing at this level:
@@ -71,9 +71,10 @@ Things worth knowing at this level:
 ## Level 2: your own shot map
 
 `run_mosh` normally picks shots between detected scene cuts. Continuous footage
-(one long take — e.g. `media/truck.AVI`) has no cuts, so it reads as **one giant
-shot** and every segment moshes the whole clip. The fix: re-encode the source with
-keyframes at *random* timestamps, then use those keyframe sections as the shot map:
+(one long take — a phone clip, dashcam footage) has no cuts, so it reads as **one
+giant shot** and every segment moshes the whole clip. The fix: re-encode the source
+with keyframes at *random* timestamps, then use those keyframe sections as the shot
+map:
 
 ```python
 import random
@@ -81,9 +82,9 @@ from datamosh import MoshConfig, run_mosh, make_moshable, keyframe_shots
 
 random.seed(5)                                   # one seed for the whole script
 
-moshable = make_moshable("media/truck.AVI", "output/truck_moshable.avi",
+moshable = make_moshable("media/my_take.mp4", "output/my_take_moshable.avi",
                          gap_range=(0.2, 10.0))  # random seconds between keyframes
-cfg = MoshConfig(source=moshable, output="output/truck_mosh.avi", n=10)
+cfg = MoshConfig(source=moshable, output="output/my_take_mosh.avi", n=10)
 run_mosh(cfg, shots=keyframe_shots(moshable))
 ```
 
@@ -116,24 +117,24 @@ from datamosh import (MoshConfig, run_mosh, make_moshable, keyframe_shots,
 random.seed(5)
 
 # 1. moshable conversion with random keyframes
-moshable = make_moshable("media/truck.AVI", "output/truck_moshable.avi")
+moshable = make_moshable("media/sample.avi", "output/splice_moshable.avi")
 
 # 2. mosh pass 1, keyframe sections as the shot map
-cfg = MoshConfig(source=moshable, output="output/truck_pass1.avi",
+cfg = MoshConfig(source=moshable, output="output/splice_pass1.avi",
                  n=10, reset=True, fixup=False)
 run_mosh(cfg, shots=keyframe_shots(moshable))
 header, movi_start, chunks = parse_avi(cfg.output)
 
 # 3. swap some sections for material from other AVIs, then delete most of the
 #    spliced keyframes so the surrounding motion blooms over the new pixels
-chunks = replace_sections(chunks, 0.25, example_section_pool("media/[AS] examples"))
+chunks = replace_sections(chunks, 0.25, example_section_pool("media/examples"))
 chunks = delete_tagged_keyframes(chunks, 0.75)
 
 # 4. mosh everything again over the merged sections
 chunks = mosh_pass(cfg, chunks, "pass 2", av_ratio=audio_video_ratio(moshable))
 
-write_avi("output/truck_moshed.avi", header, movi_start, chunks)
-ffmpeg.fixup("output/truck_moshed.avi")
+write_avi("output/splice_moshed.avi", header, movi_start, chunks)
+ffmpeg.fixup("output/splice_moshed.avi")
 ```
 
 The building blocks compose freely; the invariants to respect:
@@ -156,9 +157,9 @@ The building blocks compose freely; the invariants to respect:
 - Set `fixup=False` on intermediate configs (no point remuxing files only the
   next pass will read) and run `ffmpeg.fixup()` once on the final output.
 
-For a much bigger level-3 example — duration-targeted timelines, per-source
-config overrides, motion-weighted section picking, moshing *only* the spliced
-sections — read [recipes/narrative_8_14.py](../recipes/narrative_8_14.py).
+For a much bigger level-3 example — beat-grid timelines, section pools drawn
+from a whole folder of clips, per-section moshing as sections are placed — read
+[recipes/beat_mosh.py](../recipes/beat_mosh.py).
 
 ## Preprocessing with the decode-based effects
 
@@ -169,9 +170,9 @@ goes — typically as a first stage:
 ```python
 from datamosh import chroma_databend, pixel_sort, MoshConfig, run_mosh
 
-stage1 = chroma_databend("media/truck.AVI", "output/truck_chroma.avi",
+stage1 = chroma_databend("media/sample.avi", "output/sample_chroma.avi",
                          mode="random", planes="uv", frac=0.30, seed=5)
-run_mosh(MoshConfig(source=stage1, output="output/truck_final.avi", n=8, seed=5))
+run_mosh(MoshConfig(source=stage1, output="output/sample_final.avi", n=8, seed=5))
 ```
 
 Both take `frac` (fraction of frames touched — the effect flickers in and out

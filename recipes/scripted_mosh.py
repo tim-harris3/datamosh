@@ -5,7 +5,8 @@ MoshScript -- an ordered timeline of keyframe sections, each with explicit
 per-frame instructions -- saves it to JSON, reloads it, and renders. Run it
 twice: the two outputs are byte-identical (the printed hash proves it).
 
-    .venv\\Scripts\\python recipes\\scripted_mosh.py
+    python recipes/scripted_mosh.py    (venv active; needs media/sample.avi --
+                                        generate it with: python -m datamosh.sample)
 """
 
 import hashlib
@@ -24,7 +25,7 @@ from datamosh import (
     run_script,
 )
 
-SOURCE = "media/truck.AVI"
+SOURCE = "media/sample.avi"
 
 script = MoshScript(
     output="output/scripted_mosh.avi",
@@ -76,8 +77,8 @@ script.add(
 script.add(
     Entry(
         source=SOURCE,
-        t0=30.0,
-        t1=33.0,
+        t0=13.0,
+        t1=16.0,
         ops=[
             DeleteKeyframe(),
             Reorder(pattern="bounce"),

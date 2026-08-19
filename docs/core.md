@@ -224,9 +224,9 @@ any chunk-list transformation can sit in between.
 - `bounds_to_shots(bounds)` — boundary timestamps → `[(t0, t1), ...]` shots
   (shared with `keyframe_shots`).
 
-Note: continuous footage with no cuts (e.g. `media/truck.AVI`) comes back from
-scene detection as **one giant shot**, so every `run_mosh` segment would mosh the
-whole clip. That's what sections.py exists for.
+Note: continuous footage with no cuts (one long take — a phone clip, dashcam
+footage) comes back from scene detection as **one giant shot**, so every
+`run_mosh` segment would mosh the whole clip. That's what sections.py exists for.
 
 ### sections.py — keyframe sections and splicing
 
@@ -314,7 +314,7 @@ deliberately ignore `escalate`/intensity ramps; script authors ramp
 {
   "version": 1, "output": "output/scripted.avi", "seed": 42,
   "entries": [
-    {"source": "media/truck.AVI", "t0": 3.2, "t1": 4.6,
+    {"source": "media/sample.avi", "t0": 3.2, "t1": 4.6,
      "ops": [{"op": "delete_keyframe"},
              {"op": "dup_frames", "at": 5, "count": 3},
              {"op": "reorder", "pattern": "shuffle", "seed": 12}]}
@@ -360,7 +360,7 @@ transform.
   properly in more players — moshed files have deliberately lying indexes).
 - **paths.py** — `PROJECT_ROOT` / `MEDIA_DIR` / `OUTPUT_DIR` / `CACHE_DIR`,
   `resolve()`, which anchors relative paths at the project root so
-  `"media/truck.AVI"` works no matter which directory you run from, and the
+  `"media/sample.avi"` works no matter which directory you run from, and the
   best-effort `load_json()` / `save_json()` used for caches and presets.
 - **presets.py** — presets are plain dicts of MoshConfig field names → values.
   Built-ins in `presets.json` (safe to hand-edit), user saves in

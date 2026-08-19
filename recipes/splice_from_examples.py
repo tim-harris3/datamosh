@@ -1,4 +1,4 @@
-"""Multi-pass splice mosh (the "truck" pipeline, rebuilt on the datamosh package).
+"""Multi-pass splice mosh: bloom one video's motion over another's pixels.
 
 Pipeline:
   1. re-encode the source to a moshable AVI with keyframes at RANDOM timestamps,
@@ -11,7 +11,10 @@ Pipeline:
   4. mosh everything again (pass 2) over the merged sections
 
 Copy, rename, change the numbers, run:
-    .venv\\Scripts\\python recipes\\your_copy.py
+    python recipes/your_copy.py    (venv active)
+
+EXAMPLES must point at a folder holding at least one AVI to steal sections from
+(any AVIs -- your own renders from output/ work great).
 """
 
 import random
@@ -31,9 +34,9 @@ from datamosh import (
     write_avi,
 )
 
-SOURCE = "media/truck.AVI"  # footage to mosh
-EXAMPLES = "media/[AS] examples"  # folder of AVIs to steal sections from
-OUTPUT = "output/truck_moshed.avi"
+SOURCE = "media/sample.avi"  # footage to mosh (python -m datamosh.sample)
+EXAMPLES = "media/examples"  # folder of AVIs to steal sections from
+OUTPUT = "output/splice_moshed.avi"
 SEED = 5  # same seed = same result
 KEYFRAME_GAP = (0.2, 10.0)  # random seconds between forced keyframes
 N_SECTIONS = 10  # sections moshed and appended in pass 1
@@ -43,12 +46,12 @@ SPLICED_KEYFRAME_DELETE = 0.75  # fraction of spliced keyframes deleted after th
 random.seed(SEED)
 
 # 1. moshable conversion with random keyframes
-moshable = make_moshable(SOURCE, "output/truck_moshable.avi", gap_range=KEYFRAME_GAP)
+moshable = make_moshable(SOURCE, "output/splice_moshable.avi", gap_range=KEYFRAME_GAP)
 
 # 2. mosh pass 1, keyframe sections as the shot map
 cfg = MoshConfig(
     source=moshable,
-    output="output/truck_pass1.avi",
+    output="output/splice_pass1.avi",
     n=N_SECTIONS,
     reset=True,
     fixup=False,

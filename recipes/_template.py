@@ -1,7 +1,7 @@
 """Template recipe: every knob listed with its default and what it does.
 
 Copy this file, rename it, un-comment the lines you want to change, and run it:
-    .venv\\Scripts\\python recipes\\your_copy.py
+    python recipes/your_copy.py    (venv active)
 
 Most lines are commented out -- a commented line just means "use the default".
 Ranges are (low, high) pairs; a fresh amount inside the range is rolled each time.
