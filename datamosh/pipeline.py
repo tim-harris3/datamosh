@@ -82,15 +82,15 @@ def run_mosh(cfg=None, *, shots=None, sequence=None, progress=None):
     progress -- optional progress(frac, msg) callback for a UI progress bar.
     """
     cfg = cfg if cfg is not None else MoshConfig()
-    ffmpeg.require_ffmpeg()
-    if cfg.seed is not None:
-        random.seed(cfg.seed)
-
     if cfg.source is None and sequence is None:
         raise RuntimeError(
             "no source video given: pass --source on the CLI, set cfg.source in a "
             "recipe, or generate a demo clip with `python -m datamosh.sample`"
         )
+    ffmpeg.require_ffmpeg()
+    if cfg.seed is not None:
+        random.seed(cfg.seed)
+
     source = paths.resolve(cfg.source) if cfg.source is not None else None
     output = paths.resolve(cfg.output)
     if source is not None and not os.path.exists(source):

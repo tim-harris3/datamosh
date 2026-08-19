@@ -18,6 +18,7 @@ import random
 
 from datamosh import (
     MoshConfig,
+    audio_video_ratio,
     delete_tagged_keyframes,
     example_section_pool,
     ffmpeg,
@@ -25,7 +26,6 @@ from datamosh import (
     make_moshable,
     mosh_pass,
     parse_avi,
-    audio_video_ratio,
     replace_sections,
     run_mosh,
     write_avi,

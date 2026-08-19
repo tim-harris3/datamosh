@@ -33,8 +33,8 @@ from .config import MoshConfig, from_mapping
 from .effects import (
     databend_blob,
     delete_keyframe,
-    dup_frame,
     drop_frames,
+    dup_frame,
     interleave,
     mangle_audio,
     mosh_video,

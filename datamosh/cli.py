@@ -14,8 +14,8 @@ import argparse
 import sys
 from dataclasses import fields, replace
 
-from .config import MoshConfig, float_fields, range_fields, tunable_fields
 from . import presets
+from .config import MoshConfig, float_fields, range_fields, tunable_fields
 
 # structural fields whose flag passes the value straight through to the config
 # (reset/fixup are excluded: they're exposed as the inverted --append/--no-fixup)
