@@ -16,20 +16,12 @@ BUILTIN_FILE = paths.PROJECT_ROOT / "presets.json"
 USER_FILE = paths.OUTPUT_DIR / "user_presets.json"
 
 
-def _load(path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
-
-
 def builtin_presets():
-    return _load(BUILTIN_FILE)
+    return paths.load_json(BUILTIN_FILE, {})
 
 
 def user_presets():
-    return _load(USER_FILE)
+    return paths.load_json(USER_FILE, {})
 
 
 def all_presets():
@@ -41,7 +33,9 @@ def preset_config(name, base=None):
     """A MoshConfig with preset `name` applied over `base` (or the defaults)."""
     presets = all_presets()
     if name not in presets:
-        raise KeyError(f"unknown preset {name!r}; available: {', '.join(sorted(presets))}")
+        raise KeyError(
+            f"unknown preset {name!r}; available: {', '.join(sorted(presets))}"
+        )
     return from_mapping(presets[name], base=base if base is not None else MoshConfig())
 
 

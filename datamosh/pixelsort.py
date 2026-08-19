@@ -14,7 +14,6 @@ the highlights to full-frame venetian-blind melts.
 """
 
 import random
-import subprocess
 
 import numpy as np
 
@@ -47,9 +46,11 @@ def _key_plane(rgb, key):
     if key == "sat":
         return mx - mn
     c = np.maximum(mx - mn, 1)  # hue; guard the gray divide-by-zero
-    h = np.where(mx == r, (g - b) * 60 // c % 360,
-                 np.where(mx == g, (b - r) * 60 // c + 120,
-                          (r - g) * 60 // c + 240))
+    h = np.where(
+        mx == r,
+        (g - b) * 60 // c % 360,
+        np.where(mx == g, (b - r) * 60 // c + 120, (r - g) * 60 // c + 240),
+    )
     return np.where(mx == mn, 0, h)
 
 
@@ -100,9 +101,21 @@ def _sort_frame(rgb, mode, key, direction, lo, hi, break_p, reverse, rng):
     return rgb
 
 
-def pixel_sort(src, dst, mode="threshold", key="luma", direction="h", frac=0.20,
-               lo=64, hi=192, band_range=(8, 120), reverse=False,
-               fps=None, seed=None, keep_audio=True):
+def pixel_sort(
+    src,
+    dst,
+    mode="threshold",
+    key="luma",
+    direction="h",
+    frac=0.20,
+    lo=64,
+    hi=192,
+    band_range=(8, 120),
+    reverse=False,
+    fps=None,
+    seed=None,
+    keep_audio=True,
+):
     """Decode `src`, pixel-sort a fraction of its frames, and write a mosh-ready AVI to `dst`.
 
     Each affected frame has runs of pixels reordered into monotone streaks -- the
@@ -132,57 +145,48 @@ def pixel_sort(src, dst, mode="threshold", key="luma", direction="h", frac=0.20,
     if seed is not None:
         random.seed(seed)
     if mode != "random" and mode not in PIXELSORT_MODES:
-        raise ValueError(f"unknown pixelsort mode {mode!r}; expected 'random' or one of {PIXELSORT_MODES}")
+        raise ValueError(
+            f"unknown pixelsort mode {mode!r}; expected 'random' or one of {PIXELSORT_MODES}"
+        )
     if key != "random" and key not in PIXELSORT_KEYS:
-        raise ValueError(f"unknown pixelsort key {key!r}; expected 'random' or one of {PIXELSORT_KEYS}")
+        raise ValueError(
+            f"unknown pixelsort key {key!r}; expected 'random' or one of {PIXELSORT_KEYS}"
+        )
     if direction not in ("h", "v", "random"):
-        raise ValueError(f"unknown direction {direction!r}; expected 'h', 'v', or 'random'")
+        raise ValueError(
+            f"unknown direction {direction!r}; expected 'h', 'v', or 'random'"
+        )
     rng = np.random.default_rng(random.getrandbits(32))
     w, h = ffmpeg.dimensions(src)
     if w % 2 or h % 2:
         raise ValueError(f"pixel_sort needs even dimensions, got {w}x{h}")
-    frame_size = w * h * 3
 
-    dec = subprocess.Popen(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", src,
-         "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    n_hit = 0
+
+    def sort(frame):
+        nonlocal n_hit
+        if random.random() < frac:
+            fmode = random.choice(PIXELSORT_MODES) if mode == "random" else mode
+            fkey = random.choice(PIXELSORT_KEYS) if key == "random" else key
+            fdir = random.choice(["h", "v"]) if direction == "random" else direction
+            break_p = 1.0 / max(1, random.randint(*band_range))
+            rgb = np.frombuffer(frame, np.uint8).reshape(h, w, 3).copy()
+            rgb = _sort_frame(rgb, fmode, fkey, fdir, lo, hi, break_p, reverse, rng)
+            frame = rgb.tobytes()
+            n_hit += 1
+        return frame
+
+    n_frames = ffmpeg.stream_transform(
+        src,
+        dst,
+        sort,
+        pix_fmt="rgb24",
+        width=w,
+        height=h,
+        frame_size=w * h * 3,
+        fps=fps,
+        keep_audio=keep_audio,
+        extra_out_flags=("-pix_fmt", "yuv420p"),
     )
-    enc_cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-               "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}",
-               "-r", f"{fps:.6f}", "-i", "-"]
-    if keep_audio:  # pull audio straight from the original (raw pipe carries video only)
-        enc_cmd += ["-i", src, "-map", "0:v:0", "-map", "1:a:0?",
-                    *ffmpeg.AUDIO_ENCODE_FLAGS]
-    enc_cmd += [*ffmpeg.VIDEO_ENCODE_FLAGS, "-pix_fmt", "yuv420p", "-f", "avi", dst]
-    enc = subprocess.Popen(enc_cmd, stdin=subprocess.PIPE,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    n_frames = n_hit = 0
-    try:
-        while True:
-            frame = ffmpeg.read_exact(dec.stdout, frame_size)
-            if len(frame) < frame_size:
-                break  # last partial read = end of stream
-            n_frames += 1
-            if random.random() < frac:
-                fmode = random.choice(PIXELSORT_MODES) if mode == "random" else mode
-                fkey = random.choice(PIXELSORT_KEYS) if key == "random" else key
-                fdir = random.choice(["h", "v"]) if direction == "random" else direction
-                break_p = 1.0 / max(1, random.randint(*band_range))
-                rgb = np.frombuffer(frame, np.uint8).reshape(h, w, 3).copy()
-                rgb = _sort_frame(rgb, fmode, fkey, fdir, lo, hi, break_p, reverse, rng)
-                frame = rgb.tobytes()
-                n_hit += 1
-            enc.stdin.write(frame)
-    finally:
-        if dec.stdout:
-            dec.stdout.close()
-        if enc.stdin:
-            enc.stdin.close()
-        dec.wait()
-        enc.wait()
-    if enc.returncode:
-        raise subprocess.CalledProcessError(enc.returncode, enc_cmd)
     print(f"pixelsort {mode}/{key}/{direction}: {n_hit}/{n_frames} frames -> {dst}")
     return dst

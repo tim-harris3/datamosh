@@ -1,0 +1,16 @@
+# Normalize line endings: text files are LF in the repo, checked out per .editorconfig/git config
+* text=auto eol=lf
+
+# Media/binary files must never be normalized
+*.avi binary
+*.mp4 binary
+*.mkv binary
+*.mov binary
+*.webm binary
+*.gif binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.flac binary
+*.wav binary
+*.mp3 binary

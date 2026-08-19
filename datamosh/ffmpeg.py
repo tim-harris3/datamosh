@@ -15,8 +15,20 @@ from . import paths
 # packed bitstream), a single keyframe unless forced otherwise, no B-frames, and
 # `-fps_mode cfr` so every displayed frame is exactly one '00dc' chunk. Audio is
 # AC3 so its fixed-size chunks survive byte-level mangling.
-VIDEO_ENCODE_FLAGS = ["-c:v", "mpeg4", "-qscale:v", "4", "-g", "999999",
-                      "-bf", "0", "-sc_threshold", "0", "-fps_mode", "cfr"]
+VIDEO_ENCODE_FLAGS = [
+    "-c:v",
+    "mpeg4",
+    "-qscale:v",
+    "4",
+    "-g",
+    "999999",
+    "-bf",
+    "0",
+    "-sc_threshold",
+    "0",
+    "-fps_mode",
+    "cfr",
+]
 AUDIO_ENCODE_FLAGS = ["-c:a", "ac3", "-b:a", "192k"]
 
 DEFAULT_FPS = 30000 / 1001  # NTSC 29.97, the fallback frame rate
@@ -34,8 +46,9 @@ def require_ffmpeg():
 
 
 def _probe(args):
-    return subprocess.run(["ffprobe", "-v", "error", *args],
-                          capture_output=True, text=True, check=True).stdout.strip()
+    return subprocess.run(
+        ["ffprobe", "-v", "error", *args], capture_output=True, text=True, check=True
+    ).stdout.strip()
 
 
 def duration(path):
@@ -45,8 +58,17 @@ def duration(path):
 
 def dimensions(path):
     """(width, height) of the first video stream."""
-    out = _probe(["-select_streams", "v:0", "-show_entries", "stream=width,height",
-                  "-of", "csv=p=0:s=x", path])
+    out = _probe(
+        [
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height",
+            "-of",
+            "csv=p=0:s=x",
+            path,
+        ]
+    )
     # streams with side data (e.g. iPhone rotation) get a trailing separator
     w, h = [v for v in out.splitlines()[0].split("x") if v]
     return int(w), int(h)
@@ -54,30 +76,66 @@ def dimensions(path):
 
 def frame_rate(path):
     """Average video frame rate (frames per second)."""
-    fr = _probe(["-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate",
-                 "-of", "csv=p=0", path])
+    fr = _probe(
+        [
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=avg_frame_rate",
+            "-of",
+            "csv=p=0",
+            path,
+        ]
+    )
     num, den = fr.splitlines()[0].strip(",").split("/")
     return float(num) / float(den)
 
 
 def sample_rate(path):
     """Audio sample rate in Hz (48000 if the file has no audio stream)."""
-    ar = _probe(["-select_streams", "a:0", "-show_entries", "stream=sample_rate",
-                 "-of", "csv=p=0", path])
+    ar = _probe(
+        [
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "stream=sample_rate",
+            "-of",
+            "csv=p=0",
+            path,
+        ]
+    )
     return float(ar) if ar else 48000.0
 
 
 def video_keyflags(path):
     """Per-video-packet keyframe booleans, via ffprobe packet flags."""
-    out = _probe(["-select_streams", "v:0", "-show_entries", "packet=flags",
-                  "-of", "csv=p=0", path])
+    out = _probe(
+        [
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "packet=flags",
+            "-of",
+            "csv=p=0",
+            path,
+        ]
+    )
     return [("K" in line) for line in out.splitlines() if line.strip()]
 
 
 def keyframe_times(path):
     """Timestamps (seconds) of every video keyframe (container-level probe, no decode)."""
-    out = _probe(["-select_streams", "v:0", "-show_entries", "packet=pts_time,flags",
-                  "-of", "csv=p=0", path])
+    out = _probe(
+        [
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "packet=pts_time,flags",
+            "-of",
+            "csv=p=0",
+            path,
+        ]
+    )
     times = set()
     for line in out.splitlines():
         parts = line.split(",")
@@ -103,10 +161,26 @@ def keyframe_thumbnails(path, out_dir, width=160, cap=400):
     times = keyframe_times(path)
     expected = min(len(times), cap)
     subprocess.run(
-        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-         "-skip_frame", "nokey", "-i", path, "-vf", f"scale={width}:-2",
-         "-fps_mode", "vfr", "-frames:v", str(cap), "-q:v", "5",
-         os.path.join(out_dir, "%04d.jpg")],
+        [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-skip_frame",
+            "nokey",
+            "-i",
+            path,
+            "-vf",
+            f"scale={width}:-2",
+            "-fps_mode",
+            "vfr",
+            "-frames:v",
+            str(cap),
+            "-q:v",
+            "5",
+            os.path.join(out_dir, "%04d.jpg"),
+        ],
         check=True,
     )
     written = sorted(
@@ -117,10 +191,24 @@ def keyframe_thumbnails(path, out_dir, width=160, cap=400):
             os.remove(f)
         for i, t in enumerate(times[:cap]):
             subprocess.run(
-                ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                 "-ss", f"{t:.3f}", "-i", path, "-frames:v", "1",
-                 "-vf", f"scale={width}:-2", "-q:v", "5",
-                 os.path.join(out_dir, f"{i + 1:04d}.jpg")],
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-ss",
+                    f"{t:.3f}",
+                    "-i",
+                    path,
+                    "-frames:v",
+                    "1",
+                    "-vf",
+                    f"scale={width}:-2",
+                    "-q:v",
+                    "5",
+                    os.path.join(out_dir, f"{i + 1:04d}.jpg"),
+                ],
                 check=True,
             )
         written = sorted(
@@ -138,8 +226,18 @@ def fixup(path):
     fixed = os.path.splitext(path)[0] + "_fixed.avi"
     try:
         subprocess.run(
-            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-             "-i", path, "-c", "copy", fixed],
+            [
+                "ffmpeg",
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                path,
+                "-c",
+                "copy",
+                fixed,
+            ],
             check=True,
         )
         print(f"wrote {fixed}")
@@ -158,3 +256,114 @@ def read_exact(stream, n):
             break
         buf += chunk
     return bytes(buf)
+
+
+def stream_transform(
+    src,
+    dst,
+    transform,
+    *,
+    pix_fmt,
+    width,
+    height,
+    frame_size,
+    fps,
+    keep_audio=True,
+    extra_out_flags=(),
+):
+    """Stream src through a decode -> transform -> encode ffmpeg pipe pair.
+
+    Decodes src to raw `pix_fmt` frames, calls transform(frame_bytes) -> frame_bytes
+    on each complete frame (a short final read ends the stream), and encodes the
+    result to dst as a moshable '-f avi' with VIDEO_ENCODE_FLAGS + extra_out_flags.
+    No whole-clip buffering. Shared scaffolding for chroma_databend / pixel_sort.
+
+    keep_audio pulls the audio track straight from src (the raw pipe carries video
+    only). Returns the frame count. Raises CalledProcessError if either ffmpeg
+    process fails -- a dead decoder would otherwise look like a clean early
+    end-of-stream and silently truncate the output.
+    """
+    dec_cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        src,
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        pix_fmt,
+        "-",
+    ]
+    dec = subprocess.Popen(dec_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    enc_cmd = [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        pix_fmt,
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        f"{fps:.6f}",
+        "-i",
+        "-",
+    ]
+    if keep_audio:
+        enc_cmd += ["-i", src, "-map", "0:v:0", "-map", "1:a:0?", *AUDIO_ENCODE_FLAGS]
+    enc_cmd += [*VIDEO_ENCODE_FLAGS, *extra_out_flags, "-f", "avi", dst]
+    enc = subprocess.Popen(
+        enc_cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    n_frames = 0
+    try:
+        while True:
+            frame = read_exact(dec.stdout, frame_size)
+            if len(frame) < frame_size:
+                break  # last partial read = end of stream
+            n_frames += 1
+            enc.stdin.write(transform(frame))
+    finally:
+        if dec.stdout:
+            dec.stdout.close()
+        if enc.stdin:
+            enc.stdin.close()
+        dec.wait()
+        enc.wait()
+    if dec.returncode:
+        raise subprocess.CalledProcessError(dec.returncode, dec_cmd)
+    if enc.returncode:
+        raise subprocess.CalledProcessError(enc.returncode, enc_cmd)
+    return n_frames
+
+
+def transcode(src, dst, seconds=None):
+    """Transcode to a browser-playable H.264/AAC MP4 (the UI preview encode).
+
+    seconds caps the output length; None converts the whole file.
+    """
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", paths.resolve(src)]
+    if seconds is not None:
+        cmd += ["-t", str(seconds)]
+    cmd += [
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        paths.resolve(dst),
+    ]
+    subprocess.run(cmd, check=True)
+    return dst

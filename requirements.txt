@@ -1,2 +1,3 @@
-gradio>=6.24.0
-numpy>=2.5.2
+# Dev convenience: install the package editable with the UI extra.
+# Library-only users can just `pip install datamosh` (no gradio).
+-e .[ui]

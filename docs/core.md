@@ -37,6 +37,11 @@ output/*.avi  (+ optional *_fixed.avi via ffmpeg -c copy)
 
 Every knob the loop reads comes from a single `MoshConfig` object (config.py).
 
+The deterministic counterpart is `run_script` (script.py): instead of rolling
+effects from config probabilities, a `MoshScript` lists keyframe sections in
+order with explicit per-frame instructions — see "script.py — deterministic
+scripting" below.
+
 ## The chunk list — the one data structure
 
 `parse_avi()` turns an AVI into an ordered `list[dict]`, one dict per movi chunk:
@@ -104,10 +109,12 @@ Helpers:
   presets are applied); unknown keys raise, lists become tuples for range fields.
 - `tunable_fields()` / `float_fields()` / `range_fields()` — introspection used by
   the CLI and UI generators.
+- `escalation_intensity(escalate, index, total)` — the intensity ramp shared by
+  `run_mosh` and `mosh_pass` (1 up to `1 + escalate` across a run).
 - `dataclasses.replace(cfg, **changes)` — the standard way to derive a variant
   config in a recipe.
 
-### pipeline.py — `run_mosh(cfg, *, shots=None, progress=None)`
+### pipeline.py — `run_mosh(cfg=None, *, shots=None, sequence=None, progress=None)`
 
 The shared render loop behind the CLI, the UI, and most recipes. Per iteration
 (`cfg.n` total):
@@ -129,6 +136,13 @@ The first extracted clip's header becomes the template header for the output fil
 (or the existing output's header when `reset=False`, which is what makes appending
 across runs work). Returns `(output_path, fixed_path_or_None)`; the fixed copy is
 `ffmpeg.fixup()`'s more-seekable `-c copy` remux.
+
+**Sequence mode**: passing `sequence=[(t0, t1), ...]` (or `[(source, t0, t1), ...]`
+— a 3-tuple overrides the clip's source file) renders exactly that timeline in
+order, bypassing `cfg.n`, the shot weights, and scene detection entirely.
+Duplicates are allowed, and sections from several videos can interleave; this is
+what the UI's drag timeline drives. `cfg.seed` still makes the effect randomness
+reproducible.
 
 ### effects.py — `mosh_segment` and friends
 
@@ -153,16 +167,28 @@ reproducibility section for why the order is sacred):
    of P-frame payloads, skipping the first 16 bytes past the header so the VOP
    start code survives — corrupt macroblocks, not a dead frame.
 7. **Stretch the audio to fit.** The video probably got longer (duplication,
-   bounce), so `stretch_audio()` loops semi-random `audio_seg_range`-chunk windows
-   `audio_loop_range` times until the audio chunk count matches the video
-   *duration* — the target is `len(video) * av_ratio`, because an AC3 frame
-   (~32 ms) is slightly shorter than a video frame (~33.4 ms) and a naive 1:1
-   match would drift ~4% fast.
+   bounce), so `stretch_audio()` does a granular micro-loop: it walks the clip's
+   audio in order in small grains (`audio_grain_range` chunks each, ~32 ms per
+   chunk) and loops each grain ~`target/len(audio)` times, with per-grain quotas
+   so the chunk count lands exactly on the video *duration* — the target is
+   `len(video) * av_ratio`, because an AC3 frame (~32 ms) is slightly shorter
+   than a video frame (~33.4 ms) and a naive 1:1 match would drift ~4% fast.
 8. **Audio mangles** (`mangle_audio`): independent reverse / scramble-a-window /
    databend rolls. The audio databend skips each AC3 frame's first 8 payload
    bytes (syncword/CRC) so corrupted frames hiss and crackle instead of muting.
 9. **Interleave**: audio chunks are spread evenly between the video frames, and
    the final `(chunks, this_clip_pframes)` is returned.
+
+Since the scripting refactor, effects.py is two layers. The deterministic
+primitives — `databend_blob`, `transplant_pframes`, `dup_frame`,
+`delete_keyframe`, `reorder_pframes`, `drop_frames`, `interleave` — each take
+explicit parameters, plus an `rng` argument (a `random.Random`) wherever
+randomness is inherent (which bytes to XOR, shuffle order). The config-driven
+rolls — `mosh_video` (steps 2–6 above), `mangle_audio`, `stretch_audio` — take
+the same `rng`, defaulting to the global `random` module so `run_mosh`'s
+single-seed contract is unchanged. `mosh_segment` is now a thin composition of
+the two: split video/audio → capture → `mosh_video` → stretch/mangle audio →
+`interleave`. script.py's explicit ops call the primitives directly.
 
 ### avi.py — `parse_avi` / `write_avi`
 
@@ -195,10 +221,12 @@ any chunk-list transformation can sit in between.
 - `audio_video_ratio(source)` — audio-chunks-per-video-frame for the duration
   matching in step 7 above: `(1/fps) / (1536/sample_rate)`, probed from the real
   file, with an NTSC/48 kHz fallback (`DEFAULT_AUDIO_VIDEO_RATIO`).
+- `bounds_to_shots(bounds)` — boundary timestamps → `[(t0, t1), ...]` shots
+  (shared with `keyframe_shots`).
 
-Note: continuous footage with no cuts (e.g. `media/truck.AVI`) comes back from
-scene detection as **one giant shot**, so every `run_mosh` segment would mosh the
-whole clip. That's what sections.py exists for.
+Note: continuous footage with no cuts (one long take — a phone clip, dashcam
+footage) comes back from scene detection as **one giant shot**, so every
+`run_mosh` segment would mosh the whole clip. That's what sections.py exists for.
 
 ### sections.py — keyframe sections and splicing
 
@@ -232,6 +260,68 @@ keyframes", and let sections move between videos:
   instead of them starting clean. This one-two punch (replace, then delete) is
   the "one video's motion over another video's pixels" effect.
 
+### script.py — deterministic scripting
+
+Where `run_mosh` rolls dice, a `MoshScript` says exactly what happens: an
+ordered list of keyframe sections, each with explicit per-frame instructions,
+executed by `run_script(script)`. This is the precision counterpart to the
+random pipeline (see [recipes/scripted_mosh.py](../recipes/scripted_mosh.py)
+for a working example).
+
+Two instruction layers compose freely inside one entry:
+
+- **Explicit ops** — fully deterministic operations on the section's video
+  frame list ( `[{"v": chunk, "key": bool}, ...]`, index 0 = the keyframe):
+
+  | Op (JSON name) | What it does |
+  | --- | --- |
+  | `DeleteKeyframe(which=0)` (`delete_keyframe`) | remove the nth keyframe — the melt |
+  | `DupFrames(at, count=2)` (`dup_frames`) | insert `count` P-flagged copies after each addressed frame |
+  | `Reorder(pattern, seed=None)` (`reorder`) | `reverse` / seeded `shuffle` / `bounce`; keyframes stay anchored front |
+  | `DropFrames(frames)` (`drop_frames`) | delete exactly these frame indices |
+  | `Databend(frames=None, nbytes=4, seed=None)` (`databend`) | XOR bytes in addressed frames (`None` = all P-frames), VOP start code preserved |
+  | `Transplant(donor="prev", avi=None)` (`transplant`) | overwrite P-frame payloads from the previous entry / entry index / an explicit AVI |
+  | `FrameQuota(count, pad="freeze")` (`frame_quota`) | force an exact frame count: trim, or freeze-pad from the last frame (beat-grid trick) |
+  | `AudioReverse()` / `AudioScramble(...)` / `AudioDatabend(...)` | the audio mangles, with explicit windows/indices and seeds |
+
+- **The config layer** — `ClassicMosh(config=None, seed=None, intensity=1.0,
+  keep_keyframe=None)` (`classic_mosh`) runs the classic `mosh_video` +
+  `mangle_audio` rolls over the section with a per-entry `MoshConfig` overlay
+  (over the script's `base_config`; unknown keys raise, same as presets) and an
+  isolated seed — controlled randomness that composes with precise edits.
+
+**Frame addressing:** indices address the frame list *as the previous op left
+it* (ops run strictly in listed order), negative indices are Python-style, and
+out-of-range raises a `ValueError` naming the entry and op. The mpeg4 encoder
+can slip a second keyframe on hard scene cuts, so entries demote any non-leading
+keyframe to a P-flag right after parse (`demote_extra_keyframes=False` to keep
+them) — index 0 is reliably *the* keyframe.
+
+**Entries** address their section one of three ways: `source`+`t0`+`t1`
+(extract_shot re-encode, like run_mosh), `avi`+`section` (the nth keyframe
+section of an existing moshable AVI — no re-encode, the most reproducible), or
+`chunks` (a pre-split in-memory list; not serializable). Audio is
+granular-stretched to the final video duration and interleaved automatically at
+the end of every entry, so ops never deal with interleaving.
+
+**JSON round-trip:** `script.save(path)` / `MoshScript.load(path)` — the saved
+file *is* the recipe. Unknown op names, op fields, entry fields, and version
+mismatches all raise with the valid alternatives listed. Explicit ops
+deliberately ignore `escalate`/intensity ramps; script authors ramp
+`ClassicMosh(intensity=...)` or `count` themselves.
+
+```json
+{
+  "version": 1, "output": "output/scripted.avi", "seed": 42,
+  "entries": [
+    {"source": "media/sample.avi", "t0": 3.2, "t1": 4.6,
+     "ops": [{"op": "delete_keyframe"},
+             {"op": "dup_frames", "at": 5, "count": 3},
+             {"op": "reorder", "pattern": "shuffle", "seed": 12}]}
+  ]
+}
+```
+
 ### chroma.py and pixelsort.py — the decode-based effects
 
 Two effects can't work at the byte level, because what they touch only exists in
@@ -254,18 +344,24 @@ decoded pixels:
 Both hit a random `frac` of frames (the rest pass clean, so the effect flickers)
 and both re-emit the standard moshable single-keyframe AVI — so their output can
 feed straight back into `run_mosh` / `parse_avi` / `mosh_segment` for byte-level
-mangling on top.
+mangling on top. The decode → per-frame-callback → encode pipe scaffolding they
+share is `ffmpeg.stream_transform()`; each effect supplies only its per-frame
+transform.
 
 ### The support modules
 
-- **ffmpeg.py** — every ffmpeg/ffprobe invocation and shared encoder flag, in one
-  place: `require_ffmpeg()` (friendly install error), probes (`duration`,
-  `dimensions`, `frame_rate`, `sample_rate`, `video_keyflags`, `keyframe_times`),
-  and `fixup()` (the `-c copy` remux to a `*_fixed.avi` that seeks properly in
-  more players — moshed files have deliberately lying indexes).
-- **paths.py** — `PROJECT_ROOT` / `MEDIA_DIR` / `OUTPUT_DIR` / `CACHE_DIR`, and
+- **ffmpeg.py** — every *shared* ffmpeg/ffprobe invocation and encoder flag, in
+  one place (a recipe may still shell out for a bespoke one-off step, e.g.
+  beat_mosh's conform/mux): `require_ffmpeg()` (friendly install error), probes
+  (`duration`, `dimensions`, `frame_rate`, `sample_rate`, `video_keyflags`,
+  `keyframe_times`), `stream_transform()` (the decode → transform → encode pipe
+  pair behind chroma/pixelsort), `transcode()` (the H.264/MP4 browser-preview
+  encode), and `fixup()` (the `-c copy` remux to a `*_fixed.avi` that seeks
+  properly in more players — moshed files have deliberately lying indexes).
+- **paths.py** — `PROJECT_ROOT` / `MEDIA_DIR` / `OUTPUT_DIR` / `CACHE_DIR`,
   `resolve()`, which anchors relative paths at the project root so
-  `"media/truck.AVI"` works no matter which directory you run from.
+  `"media/sample.avi"` works no matter which directory you run from, and the
+  best-effort `load_json()` / `save_json()` used for caches and presets.
 - **presets.py** — presets are plain dicts of MoshConfig field names → values.
   Built-ins in `presets.json` (safe to hand-edit), user saves in
   `output/user_presets.json` (shadow built-ins on name clash). A preset never
@@ -278,10 +374,26 @@ Everything is re-exported from the package root
 
 ## Reproducibility: the seed contract
 
+There are two regimes since the scripting refactor:
+
+**The global-random contract (`run_mosh`, `mosh_pass`, recipes).**
 **Same seed + same config + same source = byte-identical output.** This is a hard
 guarantee the project verifies against, and it works because every random decision
 — shot picks, effect rolls, amounts within ranges — comes from Python's global
-`random` module after a single `random.seed(cfg.seed)`.
+`random` module after a single `random.seed(cfg.seed)`. (The refactor that
+extracted the effects primitives re-baselined this stream once: seeds from before
+2026-08 may render differently — still reproducibly — from here on.)
+
+**The isolated-RNG contract (`run_script`).** `run_script` never touches global
+`random`. Each op that needs randomness gets its own `random.Random`, seeded
+either by the op's explicit `seed` field or derived via SHA-256 from
+`(script.seed, entry, op index)`. Consequences: the same script JSON + the same
+source files render byte-identically with **no** seeding ceremony; reordering,
+adding, or removing entries never shifts another entry's randomness; and an
+explicit op seed pins that op no matter where it moves. The one asterisk:
+time-range entries (`source`+`t0`+`t1`) re-encode through ffmpeg, so
+byte-identity holds per ffmpeg build — `avi`+`section` entries on a pre-made
+moshable skip the re-encode and are stable across machines.
 
 The consequence: reproducibility depends on the **exact sequence of `random.*`
 calls**. Rules for anyone editing `effects.py` / `pipeline.py` (or writing recipes

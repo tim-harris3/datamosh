@@ -10,7 +10,6 @@ mangle further.
 """
 
 import random
-import subprocess
 
 from . import ffmpeg, paths
 
@@ -45,31 +44,51 @@ def _corrupt_plane(plane, mode, n_bytes=0, shift=0, bias=0):
     return plane
 
 
-def _corrupt_chroma_frame(frame, ysize, csize, mode, planes,
-                          databend_bytes, shift_range, bias_range):
+def _corrupt_chroma_frame(
+    frame, ysize, csize, mode, planes, databend_bytes, shift_range, bias_range
+):
     """Return a planar yuv420p frame with only its selected chroma plane(s) corrupted.
 
     'swap' exchanges the U and V planes wholesale (needs both, ignores `planes`); every
     other mode rolls a fresh amount per touched plane so U and V drift independently.
     """
     y = frame[:ysize]
-    u = frame[ysize:ysize + csize]
-    v = frame[ysize + csize:ysize + 2 * csize]
+    u = frame[ysize : ysize + csize]
+    v = frame[ysize + csize : ysize + 2 * csize]
     if mode == "swap":
         return y + v + u
     if "u" in planes:
-        u = _corrupt_plane(u, mode, random.randint(*databend_bytes),
-                           random.randint(*shift_range), random.randint(*bias_range))
+        u = _corrupt_plane(
+            u,
+            mode,
+            random.randint(*databend_bytes),
+            random.randint(*shift_range),
+            random.randint(*bias_range),
+        )
     if "v" in planes:
-        v = _corrupt_plane(v, mode, random.randint(*databend_bytes),
-                           random.randint(*shift_range), random.randint(*bias_range))
+        v = _corrupt_plane(
+            v,
+            mode,
+            random.randint(*databend_bytes),
+            random.randint(*shift_range),
+            random.randint(*bias_range),
+        )
     return y + u + v
 
 
-def chroma_databend(src, dst, mode="databend", planes="uv", frac=0.10,
-                    fps=None, seed=None, keep_audio=True,
-                    databend_bytes=(64, 512), shift_range=(-4000, 4000),
-                    bias_range=(-48, 48)):
+def chroma_databend(
+    src,
+    dst,
+    mode="databend",
+    planes="uv",
+    frac=0.10,
+    fps=None,
+    seed=None,
+    keep_audio=True,
+    databend_bytes=(64, 512),
+    shift_range=(-4000, 4000),
+    bias_range=(-48, 48),
+):
     """Decode `src`, corrupt ONLY its chroma (U/V) planes, and write a mosh-ready AVI to `dst`.
 
     Luma (Y) passes through untouched, so brightness and structure stay razor-sharp while
@@ -94,49 +113,43 @@ def chroma_databend(src, dst, mode="databend", planes="uv", frac=0.10,
     if seed is not None:
         random.seed(seed)
     if mode != "random" and mode not in CHROMA_MODES:
-        raise ValueError(f"unknown chroma mode {mode!r}; expected 'random' or one of {CHROMA_MODES}")
+        raise ValueError(
+            f"unknown chroma mode {mode!r}; expected 'random' or one of {CHROMA_MODES}"
+        )
     w, h = ffmpeg.dimensions(src)
     if w % 2 or h % 2:
         raise ValueError(f"chroma_databend needs even dimensions, got {w}x{h}")
     ysize, csize = w * h, (w // 2) * (h // 2)
-    frame_size = ysize + 2 * csize
 
-    dec = subprocess.Popen(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", src,
-         "-f", "rawvideo", "-pix_fmt", "yuv420p", "-"],
-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    n_hit = 0
+
+    def corrupt(frame):
+        nonlocal n_hit
+        if random.random() < frac:
+            fmode = random.choice(CHROMA_MODES) if mode == "random" else mode
+            frame = _corrupt_chroma_frame(
+                frame,
+                ysize,
+                csize,
+                fmode,
+                planes,
+                databend_bytes,
+                shift_range,
+                bias_range,
+            )
+            n_hit += 1
+        return frame
+
+    n_frames = ffmpeg.stream_transform(
+        src,
+        dst,
+        corrupt,
+        pix_fmt="yuv420p",
+        width=w,
+        height=h,
+        frame_size=ysize + 2 * csize,
+        fps=fps,
+        keep_audio=keep_audio,
     )
-    enc_cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-               "-f", "rawvideo", "-pix_fmt", "yuv420p", "-s", f"{w}x{h}",
-               "-r", f"{fps:.6f}", "-i", "-"]
-    if keep_audio:  # pull audio straight from the original (raw pipe carries video only)
-        enc_cmd += ["-i", src, "-map", "0:v:0", "-map", "1:a:0?",
-                    *ffmpeg.AUDIO_ENCODE_FLAGS]
-    enc_cmd += [*ffmpeg.VIDEO_ENCODE_FLAGS, "-f", "avi", dst]
-    enc = subprocess.Popen(enc_cmd, stdin=subprocess.PIPE,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    n_frames = n_hit = 0
-    try:
-        while True:
-            frame = ffmpeg.read_exact(dec.stdout, frame_size)
-            if len(frame) < frame_size:
-                break  # last partial read = end of stream
-            n_frames += 1
-            if random.random() < frac:
-                fmode = random.choice(CHROMA_MODES) if mode == "random" else mode
-                frame = _corrupt_chroma_frame(frame, ysize, csize, fmode, planes,
-                                              databend_bytes, shift_range, bias_range)
-                n_hit += 1
-            enc.stdin.write(frame)
-    finally:
-        if dec.stdout:
-            dec.stdout.close()
-        if enc.stdin:
-            enc.stdin.close()
-        dec.wait()
-        enc.wait()
-    if enc.returncode:
-        raise subprocess.CalledProcessError(enc.returncode, enc_cmd)
     print(f"chroma {mode} on '{planes}': {n_hit}/{n_frames} frames -> {dst}")
     return dst

@@ -6,7 +6,6 @@ keyed by the source's name+size+mtime+threshold, so every later run is instant.
 extract_shot() re-encodes one time range into a clean single-keyframe moshable AVI.
 """
 
-import json
 import os
 import re
 import subprocess
@@ -21,9 +20,21 @@ DEFAULT_AUDIO_VIDEO_RATIO = (1001 / 30000) / (1536 / 48000)
 def detect_scene_cuts(source, threshold):
     """Scene-cut timestamps (seconds) via ffmpeg's per-frame scene score. Full decode pass."""
     proc = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-nostats", "-i", source,
-         "-filter:v", f"select='gt(scene,{threshold})',showinfo", "-an", "-f", "null", "-"],
-        capture_output=True, text=True,
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            source,
+            "-filter:v",
+            f"select='gt(scene,{threshold})',showinfo",
+            "-an",
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
     )
     cuts = []
     for line in proc.stderr.splitlines():
@@ -39,6 +50,8 @@ def audio_video_ratio(source):
 
     AC3 always packs 1536 samples/frame; dividing by the real sample rate and the real video
     frame rate yields the exact ratio, so duration-matched stretching works for any source.
+    Probe the extracted MOSHABLE AVI, not the original file -- the AC3 re-encode can silently
+    resample (e.g. 16 kHz in -> 32 kHz AC3 out), which changes the ratio.
     """
     source = paths.resolve(source)
     try:
@@ -47,6 +60,16 @@ def audio_video_ratio(source):
         return (1.0 / vfps) / (1536.0 / ar)
     except (subprocess.SubprocessError, ValueError, ZeroDivisionError):
         return DEFAULT_AUDIO_VIDEO_RATIO
+
+
+def bounds_to_shots(bounds):
+    """Turn boundary timestamps [t0, t1, ...] into shots [(t0, t1), ...], dropping
+    empty spans (duplicate or out-of-order boundaries)."""
+    return [
+        (bounds[i], bounds[i + 1])
+        for i in range(len(bounds) - 1)
+        if bounds[i + 1] > bounds[i]
+    ]
 
 
 def build_scene_map(source, threshold=0.30):
@@ -59,28 +82,20 @@ def build_scene_map(source, threshold=0.30):
     cache_path = paths.CACHE_DIR / "scene_cuts.json"
     st = os.stat(source)
     sig = f"{os.path.basename(source)}:{st.st_size}:{int(st.st_mtime)}:{threshold}"
-    try:
-        cache = json.load(open(cache_path))
-    except (OSError, ValueError):
-        cache = {}
+    cache = paths.load_json(cache_path, {})
     entry = cache.get(sig)
     if entry:
         return [tuple(s) for s in entry["shots"]], entry["duration"]
 
     duration = ffmpeg.duration(source)
     cuts = [t for t in detect_scene_cuts(source, threshold) if 0.0 < t < duration]
-    bounds = [0.0] + cuts + [duration]
-    shots = [
-        (bounds[i], bounds[i + 1])
-        for i in range(len(bounds) - 1)
-        if bounds[i + 1] > bounds[i]
-    ]
+    shots = bounds_to_shots([0.0] + cuts + [duration])
     try:
         paths.ensure_output_dirs()
         cache[sig] = {"duration": duration, "shots": shots}
-        json.dump(cache, open(cache_path, "w"))
+        paths.save_json(cache_path, cache)
     except OSError:
-        pass
+        pass  # cache write is best-effort; worst case the next run re-detects
     return shots, duration
 
 
@@ -94,9 +109,23 @@ def extract_shot(src, t0, dur, temp):
     interleaved so it gets mangled too).
     """
     subprocess.run(
-        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-         "-ss", f"{t0:.3f}", "-i", src, "-t", f"{dur:.3f}",
-         *ffmpeg.VIDEO_ENCODE_FLAGS, *ffmpeg.AUDIO_ENCODE_FLAGS,
-         "-f", "avi", temp],
+        [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-ss",
+            f"{t0:.3f}",
+            "-i",
+            src,
+            "-t",
+            f"{dur:.3f}",
+            *ffmpeg.VIDEO_ENCODE_FLAGS,
+            *ffmpeg.AUDIO_ENCODE_FLAGS,
+            "-f",
+            "avi",
+            temp,
+        ],
         check=True,
     )
