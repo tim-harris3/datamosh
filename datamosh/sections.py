@@ -15,8 +15,9 @@ import subprocess
 
 from . import ffmpeg, paths
 from .avi import parse_avi
+from .config import escalation_intensity
 from .effects import mosh_segment
-from .scenes import DEFAULT_AUDIO_VIDEO_RATIO
+from .scenes import DEFAULT_AUDIO_VIDEO_RATIO, bounds_to_shots
 
 
 def make_moshable(src, dst, gap_range=(0.2, 10.0), duration=None):
@@ -39,10 +40,19 @@ def make_moshable(src, dst, gap_range=(0.2, 10.0), duration=None):
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", src]
     if duration:
         cmd += ["-t", f"{duration:.3f}"]
-    cmd += [*ffmpeg.VIDEO_ENCODE_FLAGS,
-            "-force_key_frames", ",".join(f"{x:.3f}" for x in times),
-            *ffmpeg.AUDIO_ENCODE_FLAGS, "-ar", "48000", "-ac", "2",
-            "-f", "avi", dst]
+    cmd += [
+        *ffmpeg.VIDEO_ENCODE_FLAGS,
+        "-force_key_frames",
+        ",".join(f"{x:.3f}" for x in times),
+        *ffmpeg.AUDIO_ENCODE_FLAGS,
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
+        "-f",
+        "avi",
+        dst,
+    ]
     subprocess.run(cmd, check=True)
     print(f"moshable: {dst} ({len(times)} random keyframes over {total:.1f}s)")
     return dst
@@ -53,12 +63,7 @@ def keyframe_shots(path):
     its keyframe sections as a run_mosh shot map [(t0, t1), ...] -- so run_mosh picks
     random-length sections instead of scene cuts."""
     path = paths.resolve(path)
-    bounds = ffmpeg.keyframe_times(path) + [ffmpeg.duration(path)]
-    return [
-        (bounds[i], bounds[i + 1])
-        for i in range(len(bounds) - 1)
-        if bounds[i + 1] > bounds[i]
-    ]
+    return bounds_to_shots(ffmpeg.keyframe_times(path) + [ffmpeg.duration(path)])
 
 
 def split_sections(chunks):
@@ -81,17 +86,20 @@ def mosh_pass(cfg, chunks, label="mosh pass", av_ratio=DEFAULT_AUDIO_VIDEO_RATIO
     across the run, and each clip's genuine P-frames seed the next transplant."""
     sections = split_sections(chunks)
     out, prev_pframes = [], None
-    n = len(sections)
+    n_sections = len(sections)
     for i, sec in enumerate(sections):
-        intensity = 1 + cfg.escalate * (i / max(1, n - 1)) if cfg.escalate else 1.0
         moshed, prev_pframes = mosh_segment(
-            cfg, sec, keep_keyframe=(i == 0), donor_pframes=prev_pframes,
-            intensity=intensity, av_ratio=av_ratio,
+            cfg,
+            sec,
+            keep_keyframe=(i == 0),
+            donor_pframes=prev_pframes,
+            intensity=escalation_intensity(cfg.escalate, i, n_sections),
+            av_ratio=av_ratio,
         )
         out.extend(moshed)
-    vin = sum(1 for c in chunks if c["stream"] == "v")
-    vout = sum(1 for c in out if c["stream"] == "v")
-    print(f"{label}: {n} sections, {vin}->{vout} vframes")
+    v_in = sum(1 for c in chunks if c["stream"] == "v")
+    v_out = sum(1 for c in out if c["stream"] == "v")
+    print(f"{label}: {n_sections} sections, {v_in}->{v_out} vframes")
     return out
 
 
@@ -110,8 +118,7 @@ def example_section_pool(examples_dir):
         if path not in cache:
             _, _, chunks = parse_avi(path)
             cache[path] = [
-                s for s in split_sections(chunks)
-                if any(c["stream"] == "v" for c in s)
+                s for s in split_sections(chunks) if any(c["stream"] == "v" for c in s)
             ]
         sections = cache[path]
         if not sections:
@@ -147,7 +154,8 @@ def delete_tagged_keyframes(chunks, frac, tag="spliced"):
     so the surrounding motion blooms over the spliced pixels instead of them starting
     clean."""
     key_idx = [
-        i for i, c in enumerate(chunks)
+        i
+        for i, c in enumerate(chunks)
         if c["stream"] == "v" and c["key"] and c.get(tag)
     ]
     kill = set(random.sample(key_idx, round(len(key_idx) * frac)))
