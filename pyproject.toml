@@ -5,9 +5,42 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "datamosh"
 version = "0.1.0"
-description = "Shot-based datamoshing toolkit: core library, CLI, recipes, and a Gradio UI"
+description = "Programmatic datamoshing: byte-level video corruption with deterministic, scriptable glitch timelines"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Tim Harris" }]
 requires-python = ">=3.10"
-dependencies = ["gradio"]
+dependencies = ["numpy>=1.24"]
+keywords = ["datamosh", "glitch", "video", "ffmpeg", "pixel-sort", "databending", "glitch-art"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Other Audience",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Artistic Software",
+]
+
+[project.optional-dependencies]
+ui = ["gradio>=6.24"]
+
+[project.scripts]
+datamosh = "datamosh.cli:main"
+datamosh-ui = "datamosh.ui.app:main"
+
+[project.urls]
+Homepage = "https://github.com/tim-harris3/moshing"
+Documentation = "https://github.com/tim-harris3/moshing/tree/master/docs"
+Issues = "https://github.com/tim-harris3/moshing/issues"
 
 [tool.setuptools]
-packages = ["datamosh"]
+packages = ["datamosh", "datamosh.ui"]
+
+[tool.setuptools.package-data]
+"datamosh.ui" = ["static/*"]

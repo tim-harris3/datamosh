@@ -1,11 +1,23 @@
+# environments / build
 .venv/
 __pycache__/
 *.pyc
 *.egg-info/
+dist/
+build/
+
+# local media and render output (never committed)
 media/
 output/
 8-14/
+8-18/
+beat test/
 them jawns clips/
+
+# personal recipes kept out of the public repo
+recipes/private/
+
+# media files anywhere in the tree
 *.flac
 *.mp4
 *.avi
