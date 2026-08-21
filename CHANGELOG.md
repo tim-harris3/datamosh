@@ -4,6 +4,12 @@
 
 First public release.
 
+- Frame-number addressing: `Entry(avi=..., f0=..., f1=...)` selects exactly
+  video frames `[f0, f1)` of a moshable AVI as a fourth MoshScript addressing
+  mode — half-open like a Python slice, negatives allowed, pure list slicing
+  of the parsed bytes (no re-encode). A range with no keyframe melts by
+  design. New helper: `datamosh.slice_frames()`. Scripts stay version 1; old
+  scripts load unchanged.
 - Export: `datamosh export <src> [dst] [--to mp4|webm|gif]` (and
   `datamosh.export()`) transcodes a moshed AVI into something shareable —
   H.264/AAC mp4 with `+faststart`, VP9/Opus webm, or a palette-optimized gif

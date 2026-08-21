@@ -78,6 +78,7 @@ from .sections import (
     make_moshable,
     mosh_pass,
     replace_sections,
+    slice_frames,
     split_sections,
 )
 
@@ -142,6 +143,7 @@ __all__ = [
     "make_moshable",
     "keyframe_shots",
     "split_sections",
+    "slice_frames",
     "describe_sections",
     "mosh_pass",
     "example_section_pool",
