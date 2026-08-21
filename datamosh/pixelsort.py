@@ -118,6 +118,7 @@ def pixel_sort(
     fps=None,
     seed=None,
     keep_audio=True,
+    encoder="mpeg4",
     progress=None,
 ):
     """Decode `src`, pixel-sort a fraction of its frames, and write a mosh-ready AVI to `dst`.
@@ -140,9 +141,11 @@ def pixel_sort(
     reverse   -- sort descending instead of ascending.
     fps       -- output frame rate; None (default) probes the source's own rate.
                  Overriding it desyncs the video from the kept audio track.
+    encoder   -- moshable video encoder for the re-emit, 'mpeg4' or 'xvid'.
     Returns `dst`.
     """
     ffmpeg.require_ffmpeg()
+    ffmpeg.require_encoder(encoder)
     src, dst = paths.resolve(src), paths.resolve(dst)
     if fps is None:
         fps = ffmpeg.frame_rate(src)
@@ -191,6 +194,7 @@ def pixel_sort(
         fps=fps,
         keep_audio=keep_audio,
         extra_out_flags=("-pix_fmt", "yuv420p"),
+        encoder=encoder,
         progress=progress,
         total_frames=max(1, round(ffmpeg.duration(src) * fps)),
     )

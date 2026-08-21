@@ -4,6 +4,15 @@
 
 First public release.
 
+- Xvid encoder support: `encoder="xvid"` (or `--encoder xvid` on `datamosh` and
+  `datamosh prepare`) encodes moshable AVIs with libxvid instead of native
+  mpeg4 — the classic community-mosh encoder, same MPEG-4 ASP shape (`-bf 0`
+  keeps the packed bitstream off), `xvid` fourcc. Threaded everywhere a
+  moshable is produced: `MoshConfig.encoder`, `MoshScript.encoder` (serialized
+  only when non-default, so old scripts load unchanged), `extract_shot`,
+  `make_moshable`, `chroma_databend`, `pixel_sort`. libxvid ships in full
+  ffmpeg builds only; `ffmpeg.require_encoder()` fails fast with an actionable
+  error, and sections from both encoders mix freely in one spliced stream.
 - Frame-number addressing: `Entry(avi=..., f0=..., f1=...)` selects exactly
   video frames `[f0, f1)` of a moshable AVI as a fourth MoshScript addressing
   mode — half-open like a Python slice, negatives allowed, pure list slicing

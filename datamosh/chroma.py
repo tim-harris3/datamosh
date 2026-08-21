@@ -91,6 +91,7 @@ def chroma_databend(
     databend_bytes=(64, 512),
     shift_range=(-4000, 4000),
     bias_range=(-48, 48),
+    encoder="mpeg4",
     progress=None,
 ):
     """Decode `src`, corrupt ONLY its chroma (U/V) planes, and write a mosh-ready AVI to `dst`.
@@ -108,9 +109,11 @@ def chroma_databend(
     databend_bytes / shift_range / bias_range -- (lo, hi) amounts for the matching modes.
     fps -- output frame rate; None (default) probes the source's own rate. Overriding
            it desyncs the video from the kept audio track.
+    encoder -- moshable video encoder for the re-emit, 'mpeg4' or 'xvid'.
     Returns `dst`.
     """
     ffmpeg.require_ffmpeg()
+    ffmpeg.require_encoder(encoder)
     src, dst = paths.resolve(src), paths.resolve(dst)
     if fps is None:
         fps = ffmpeg.frame_rate(src)
@@ -154,6 +157,7 @@ def chroma_databend(
         frame_size=ysize + 2 * csize,
         fps=fps,
         keep_audio=keep_audio,
+        encoder=encoder,
         progress=progress,
         total_frames=max(1, round(ffmpeg.duration(src) * fps)),
     )

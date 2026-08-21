@@ -67,11 +67,18 @@ extra keys are harmless.
 
 Byte-level moshing only works if the file has a strict, predictable shape, so every
 moshable AVI in the project is produced with the same encoder settings
-([ffmpeg.py](../datamosh/ffmpeg.py) `VIDEO_ENCODE_FLAGS` / `AUDIO_ENCODE_FLAGS`):
+([ffmpeg.py](../datamosh/ffmpeg.py) `video_encode_flags(encoder)` /
+`AUDIO_ENCODE_FLAGS`; `VIDEO_ENCODE_FLAGS` is the default-mpeg4 alias):
 
-- **native `mpeg4` (MPEG-4 ASP)** — P-frames survive being reordered/duplicated and
-  decoders keep playing through the damage instead of bailing. No Xvid
-  packed-bitstream weirdness.
+- **MPEG-4 ASP** — P-frames survive being reordered/duplicated and decoders keep
+  playing through the damage instead of bailing. Two encoders emit this shape:
+  native `mpeg4` (the default, in every ffmpeg build) and `libxvid` via
+  `encoder="xvid"` (the classic community-mosh encoder; full ffmpeg builds only —
+  `require_encoder()` gives the actionable error). They differ only in fourcc
+  (`FMP4` vs `xvid`) and rate-control character; both decode with the same mpeg4
+  decoder, so mixing sections from both encoders in one spliced stream is fine.
+  No Xvid packed-bitstream weirdness either way — `-bf 0` keeps libxvid's packed
+  mode off (it only packs when B-frames are in use).
 - **`-g 999999 -sc_threshold 0`** — exactly one keyframe (or only the ones
   `make_moshable` forces), so *we* control where the anchors are.
 - **`-bf 0`** — no B-frames; B-frames reference future frames and break when

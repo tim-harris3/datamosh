@@ -99,10 +99,11 @@ def build_scene_map(source, threshold=0.30):
     return shots, duration
 
 
-def extract_shot(src, t0, dur, temp):
+def extract_shot(src, t0, dur, temp, encoder="mpeg4"):
     """Re-extract [t0, t0+dur) from the source as a single-keyframe MPEG-4 ASP AVI.
 
-    Uses the native mpeg4 encoder (no Xvid packed-bitstream) and `-fps_mode cfr` so every
+    Uses the shared moshable encode shape (native mpeg4 by default, libxvid for
+    encoder="xvid"; either way no packed bitstream) and `-fps_mode cfr` so every
     displayed frame is exactly one '00dc' chunk -- otherwise ffmpeg pads the video with
     N-VOPs to sync to the copied audio and the demuxer later merges them, breaking the
     1-chunk-per-frame mapping the byte moshing relies on. Audio is re-encoded to AC3 (kept
@@ -121,7 +122,7 @@ def extract_shot(src, t0, dur, temp):
             src,
             "-t",
             f"{dur:.3f}",
-            *ffmpeg.VIDEO_ENCODE_FLAGS,
+            *ffmpeg.video_encode_flags(encoder),
             *ffmpeg.AUDIO_ENCODE_FLAGS,
             "-f",
             "avi",
