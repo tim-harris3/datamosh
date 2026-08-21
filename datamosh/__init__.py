@@ -15,6 +15,16 @@ import logging as _logging
 
 from . import cli, ffmpeg, paths, presets, sections
 from .avi import parse_avi, write_avi
+from .beat import (
+    BeatGrid,
+    Placement,
+    SectionRef,
+    cycle_shuffled,
+    entries_from_beats,
+    load_section_refs,
+    place_sections,
+    section_pool,
+)
 from .chroma import CHROMA_MODES, chroma_databend
 from .config import (
     MoshConfig,
@@ -134,6 +144,14 @@ __all__ = [
     "AudioReverse",
     "AudioScramble",
     "AudioDatabend",
+    "BeatGrid",
+    "Placement",
+    "SectionRef",
+    "place_sections",
+    "load_section_refs",
+    "cycle_shuffled",
+    "section_pool",
+    "entries_from_beats",
     "bounds_to_shots",
     "build_scene_map",
     "detect_scene_cuts",

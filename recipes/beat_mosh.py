@@ -2,17 +2,18 @@
 
 Normalizes every clip in the folder to a common resolution/fps, then runs
 make_moshable() on each with the keyframe gap tied to the song's tempo: gaps
-are drawn between a sixteenth note and a bar, so sections natively last 1/4-4
-beats. Every keyframe section from every moshable goes into a shuffled
-no-repeat pool; sections are drawn onto the timeline and each is snapped
-(trimmed or freeze-padded) to its nearest sixteenth-note multiple, clamped to
-the same 1/4-4 beat range, on the cumulative grid -- every cut lands exactly
-on the sixteenth grid, from machine-gun 16th-note cuts to full-bar holds. Each
-section is byte-moshed with mosh_segment() as it is placed (transplants, dup
-blooms, reorders), and a share of sections get their keyframe deleted for the
-classic melt -- so blooms and melts happen ON the beat. Chroma corruption and
-pixel sorting run on top, and the song is muxed in as the only audio track of
-the final mp4.
+are drawn across the CUT_BEATS range, so sections natively last about as long
+as a cut. Every keyframe section from every moshable goes into a shuffled
+no-repeat pool (section_pool); entries_from_beats() draws sections onto the
+timeline, snapping each (trimmed or freeze-padded) to its nearest grid
+multiple on the *cumulative* grid -- every cut lands exactly on the sixteenth
+grid, drift-free for the whole song. Each section is byte-moshed as it is
+placed (ClassicMosh: transplants, dup blooms, reorders), and a share of
+sections get their keyframe deleted for the classic melt -- so blooms and
+melts happen ON the beat. The whole timeline runs as one deterministic
+MoshScript (saved next to the output, shareable and re-runnable), chroma
+corruption and pixel sorting run on top, and the song is muxed in as the only
+audio track of the final mp4.
 
 Clips keep their native resolution: the conform target is the most common
 resolution/fps among the folder's clips; only mismatched clips are letterboxed.
@@ -28,17 +29,19 @@ import sys
 from collections import Counter
 
 from datamosh import (
-    MoshConfig,
+    BeatGrid,
+    ClassicMosh,
+    DeleteKeyframe,
+    MoshScript,
     chroma_databend,
     enable_console_logging,
+    entries_from_beats,
     ffmpeg,
     make_moshable,
-    mosh_segment,
-    parse_avi,
     paths,
     pixel_sort,
-    split_sections,
-    write_avi,
+    run_script,
+    section_pool,
 )
 
 enable_console_logging()  # recipes are CLI tools: show the render lines
@@ -55,10 +58,11 @@ SONG_START = 0.0  # seconds into the song to start from
 TARGET_SECONDS = None  # None = full song (duration - SONG_START)
 FPS = None  # None = most common native fps among the clips
 WIDTH = HEIGHT = None  # None = most common native resolution (nudged to even)
-CUT_BEATS = (0.25, 0.5)  # cut length bounds in beats: sixteenth note .. one bar;
+CUT_BEATS = (0.25, 0.5)  # cut length bounds in beats: sixteenth .. eighth note;
 # also the make_moshable keyframe gap range
 GRID_DIV = 4  # grid resolution per beat (4 = sixteenth notes)
 MELT_PROB = 0.30  # keyframe-delete chance per section (never the first)
+ESCALATE = 1.0  # intensity ramps 1 -> 1+ESCALATE across the song (0 disables)
 CHROMA = dict(mode="random", planes="uv", frac=0.3)  # frac 0 disables
 PIXELSORT = dict(
     mode="threshold", key="hue", direction="h", frac=0.2, lo=64, hi=192, reverse=False
@@ -66,18 +70,18 @@ PIXELSORT = dict(
 VIDEO_EXTS = (".avi", ".mp4", ".mov", ".mkv", ".webm", ".m4v")
 
 GRID_AVI = "output/beat_grid.avi"  # moshed, cuts on the grid
+SCRIPT_JSON = "output/beat_mosh_script.json"  # the timeline, re-runnable
 CHROMA_AVI = "output/beat_chroma.avi"
 SORT_AVI = "output/beat_sort.avi"
 NORM_DIR = "output/beat_norm"  # normalized clip cache
 MOSH_DIR = "output/beat_moshable"  # bpm-gapped moshable cache
 
-# only the mangle tunables are read (mosh_segment is driven directly below);
-# keyframe deletion stays off because melts are applied manually on the grid.
+# only the mangle tunables are set (ClassicMosh reads them via base_config);
+# keyframe deletion stays off because melts are applied explicitly on the grid.
 # Everything else sits well under the MoshConfig defaults -- sections are
 # trimmed to short beat quotas, so even a modest dup bloom fills a whole cut
-CFG = MoshConfig(
+CFG = dict(
     keyframe_delete_prob=0.0,
-    escalate=1,
     video_transplant_prob=0.20,
     video_shuffle_prob=0.15,
     video_reverse_prob=0.15,
@@ -168,70 +172,45 @@ for src in clips:
         make_moshable(src, dst, gap_range=gap)
     moshables.append(dst)
 
-# ---- pool every keyframe section from every moshable ----
-header = movi_start = None
-pool_master = []
-for m in moshables:
-    hd, ms, chunks = parse_avi(m)
-    if header is None:
-        header, movi_start = hd, ms
-    for sec in split_sections(chunks):
-        pool_master.append((os.path.basename(m), sec))
-print(f"{len(pool_master)} keyframe sections pooled from {len(moshables)} moshables")
-
-# ---- draw sections onto the grid, snapping each to a sixteenth multiple ----
-random.seed(SEED)
-rng = random.Random(SEED + 3)  # melt rolls, independent of the effect RNG
+# ---- draw sections onto the grid and mosh them as one deterministic script ----
 target = TARGET_SECONDS if TARGET_SECONDS else ffmpeg.duration(song) - SONG_START
-unit = beat / GRID_DIV  # grid step (a sixteenth note), in seconds
-k_lo = max(1, round(CUT_BEATS[0] * GRID_DIV))
-k_hi = max(k_lo, round(CUT_BEATS[1] * GRID_DIV))
-pool = []
-out, prev_pframes, last_v = [], None, None
-melts = cum = i = 0
-while cum * unit < target:
-    if not pool:
-        pool = list(pool_master)
-        random.shuffle(pool)
-    name, sec = pool.pop()
-    seg = [dict(c) for c in sec]  # mosh_segment mutates; the pool may be redrawn
-    k = min(max(round(len(seg) / (unit * fps)), k_lo), k_hi)  # in grid units
-    quota = round((cum + k) * unit * fps) - round(cum * unit * fps)
-    intensity = (
-        1 + CFG.escalate * min(1.0, cum * unit / target) if CFG.escalate else 1.0
-    )
-    moshed, prev_pframes = mosh_segment(
-        CFG,
-        seg,
-        keep_keyframe=(i == 0),
-        donor_pframes=prev_pframes,
-        intensity=intensity,
-    )
-    vid = [c for c in moshed if c["stream"] == "v"]
-    melt = bool(i) and rng.random() < MELT_PROB
-    if melt:
-        vid = [c for c in vid if not c["key"]]
-        melts += 1
-    kept = vid[:quota]
-    pad = kept[-1] if kept else last_v
-    while len(kept) < quota:
-        kept.append({**dict(pad), "key": False})
-    out.extend(kept)
-    last_v = kept[-1]
-    print(
-        f"[{i}] {name}: {len(seg)}f section -> {k / GRID_DIV:g}-beat cut "
-        f"({quota}f){' (melt)' if melt else ''}"
-    )
-    cum += k
-    i += 1
-grid = paths.resolve(GRID_AVI)
-write_avi(grid, header, movi_start, out)
+grid = BeatGrid(bpm=BPM, fps=fps, div=GRID_DIV)
+pool = section_pool(moshables, random.Random(SEED))
+melt_rng = random.Random(SEED + 3)  # melt rolls, independent of the effect RNG
+
+
+def ops_for(i, ref, placement):
+    # escalation: intensity ramps from 1 up to 1+ESCALATE across the song
+    ramp = min(1.0, placement.start_units * grid.unit_seconds / target)
+    ops = [ClassicMosh(intensity=1.0 + ESCALATE * ramp)]
+    # melt: delete the keyframe ON the beat -- never entry 0, the stream's start
+    if i and melt_rng.random() < MELT_PROB:
+        ops.append(DeleteKeyframe())
+    return ops
+
+
+entries, placements = entries_from_beats(
+    pool, grid, target, min_beats=CUT_BEATS[0], max_beats=CUT_BEATS[1], ops_for=ops_for
+)
+script = MoshScript(
+    entries=entries,
+    output=GRID_AVI,
+    seed=SEED,
+    fixup=False,
+    checkpoint=False,  # hundreds of grid entries: skip the per-entry rewrites
+    base_config=CFG,
+)
+script.save(SCRIPT_JSON)  # the whole beat timeline, shareable and re-runnable
+grid_avi, _ = run_script(script)
+melts = sum(any(isinstance(op, DeleteKeyframe) for op in e.ops) for e in entries)
+end = placements[-1].start_units + placements[-1].units
 print(
-    f"wrote {grid} ({len(out)} frames over {cum / GRID_DIV:g} beats, " f"{melts} melts)"
+    f"wrote {grid_avi} ({len(entries)} cuts, {sum(p.frames for p in placements)} "
+    f"frames over {end / GRID_DIV:g} beats, {melts} melts) -- script: {SCRIPT_JSON}"
 )
 
 # ---- post effects: chroma -> pixel sort (same order and seeds as the UI) ----
-cur = grid
+cur = grid_avi
 if CHROMA["frac"] > 0:
     cur = chroma_databend(cur, paths.resolve(CHROMA_AVI), **CHROMA, seed=SEED + 1)
     print(f"chroma -> {cur}")
@@ -240,41 +219,5 @@ if PIXELSORT["frac"] > 0:
     print(f"pixel sort -> {cur}")
 
 # ---- mux the song in as the only audio track ----
-final = paths.resolve(OUTPUT_MP4)
-subprocess.run(
-    [
-        "ffmpeg",
-        "-y",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-i",
-        cur,
-        "-ss",
-        f"{SONG_START:.3f}",
-        "-i",
-        song,
-        "-map",
-        "0:v:0",
-        "-map",
-        "1:a:0",
-        "-c:v",
-        "libx264",
-        "-crf",
-        "18",
-        "-preset",
-        "medium",
-        "-pix_fmt",
-        "yuv420p",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-shortest",
-        "-movflags",
-        "+faststart",
-        final,
-    ],
-    check=True,
-)
+final = ffmpeg.mux_audio(cur, song, OUTPUT_MP4, audio_start=SONG_START)
 print(f"wrote {final} ({ffmpeg.duration(final):.1f}s)")

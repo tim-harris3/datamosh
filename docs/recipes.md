@@ -159,7 +159,10 @@ The building blocks compose freely; the invariants to respect:
 
 For a much bigger level-3 example — beat-grid timelines, section pools drawn
 from a whole folder of clips, per-section moshing as sections are placed — read
-[recipes/beat_mosh.py](../recipes/beat_mosh.py).
+[recipes/beat_mosh.py](../recipes/beat_mosh.py). Its grid machinery lives in
+the library (`BeatGrid`, `section_pool`, `entries_from_beats` — see
+[core.md](core.md#beatpy--beat-grid-placement)), so the recipe itself is just
+policy: which sections melt, how intensity ramps, what gets muxed on top.
 
 ## Preprocessing with the decode-based effects
 

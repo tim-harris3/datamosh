@@ -336,6 +336,13 @@ mismatches all raise with the valid alternatives listed. Explicit ops
 deliberately ignore `escalate`/intensity ramps; script authors ramp
 `ClassicMosh(intensity=...)` or `count` themselves.
 
+**Checkpointing:** by default `run_script` rewrites the whole output AVI after
+every entry, so an interrupted run still leaves a playable file — O(n²) I/O
+that's fine for a dozen entries and painful for a beat grid's hundreds.
+`MoshScript(checkpoint=False)` skips the per-entry writes; the final write
+always happens, and the output bytes are identical either way (serialized only
+when `False`, like `encoder`, so old scripts load unchanged).
+
 ```json
 {
   "version": 1, "output": "output/scripted.avi", "seed": 42,
@@ -347,6 +354,44 @@ deliberately ignore `escalate`/intensity ramps; script authors ramp
   ]
 }
 ```
+
+### beat.py — beat-grid placement
+
+The bridge from a song's tempo to a `MoshScript`: place keyframe sections on a
+musical grid so every cut (and melt, and bloom) lands on the beat. See
+[recipes/beat_mosh.py](../recipes/beat_mosh.py) for the whole pipeline in use.
+
+- `BeatGrid(bpm, fps, div=4)` — a uniform grid in integer *units* (`div=4` =
+  sixteenth notes). `frame_at(units)` is the single bridge from grid positions
+  to frame numbers; `quota(start, length)` gives a cut's exact frame count
+  *against the cumulative position*, `snap_units(n_frames, lo, hi)` snaps a
+  section's natural length to the grid, `clamp_range(min_beats, max_beats)`
+  converts beat bounds to unit bounds. The cumulative math is the point: a
+  grid unit is rarely a whole number of frames, and summing per-section
+  rounded lengths drifts off the song by a frame every few bars —
+  `quota` telescopes, so the total stays within half a frame of true beat time
+  no matter how many sections are placed.
+- `place_sections(frame_counts, grid, target_seconds, min_beats, max_beats)` —
+  snap+clamp each count and cover the target; returns `Placement(start_units,
+  units, frames)` records.
+- `SectionRef(avi, section, vframes)` / `load_section_refs(avis)` — every
+  keyframe section of every AVI by `(avi, section)` address (exactly what
+  `MoshScript` entries take) plus its **video-only** frame count, so placement
+  never re-reads the files.
+- `cycle_shuffled(items, rng)` / `section_pool(avis, rng)` — an infinite
+  shuffled draw with no repeats per cycle; all order comes from the caller's
+  `random.Random`.
+- `entries_from_beats(refs, grid, target_seconds, ..., ops_for=None)` — the
+  one-call version: draws refs, places them, and returns `(entries,
+  placements)` where each entry's ops are `ops_for(i, ref, placement)` with
+  `FrameQuota(count=placement.frames)` appended **last**, so trim/freeze-pad
+  runs after every other op and the cut still lands exactly on the grid.
+
+Policy stays in the caller: melts, escalation, and every random roll live in
+`ops_for` and the caller's rng — beat.py never touches global random, and the
+grid math never touches disk. A future `[beats]` extra can add
+`grid_from_beat_times()` onset detection behind the same
+`frame_at`/`quota`/`snap_units` interface.
 
 ### chroma.py and pixelsort.py — the decode-based effects
 
@@ -382,7 +427,9 @@ transform.
   (`duration`, `dimensions`, `frame_rate`, `sample_rate`, `video_keyflags`,
   `keyframe_times`), `stream_transform()` (the decode → transform → encode pipe
   pair behind chroma/pixelsort), `transcode()` (the H.264/MP4 browser-preview
-  encode), and `fixup()` (the `-c copy` remux to a `*_fixed.avi` that seeks
+  encode), `mux_audio()` (mux a song in as the only audio track of a final
+  H.264/AAC mp4 — the beat_mosh delivery step), and `fixup()` (the `-c copy`
+  remux to a `*_fixed.avi` that seeks
   properly in more players — moshed files have deliberately lying indexes).
 - **paths.py** — `PROJECT_ROOT` / `MEDIA_DIR` / `OUTPUT_DIR` / `CACHE_DIR`,
   `resolve()`, which anchors relative paths at the project root so

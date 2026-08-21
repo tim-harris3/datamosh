@@ -629,6 +629,12 @@ class MoshScript:
     ffmpeg/libxvidcore build*. `avi`+`section` and `avi`+`f0`+`f1` entries never
     re-encode, so they stay byte-exact regardless of the setting. (A per-entry
     encoder override is future work.)
+
+    `checkpoint` controls the crash-safety rewrite: by default the whole output
+    AVI is rewritten after every entry, so an interrupted run still leaves a
+    playable file. That is O(n^2) I/O -- fine for a dozen entries, painful for
+    a beat grid's hundreds -- so checkpoint=False skips the per-entry writes
+    and only the final write happens. Output bytes are identical either way.
     """
 
     entries: list = field(default_factory=list)
@@ -637,6 +643,7 @@ class MoshScript:
     reset: bool = True
     fixup: bool = True
     encoder: str = "mpeg4"  # serialized only when non-default
+    checkpoint: bool = True  # serialized only when False
     base_config: dict = field(default_factory=dict)  # ClassicMosh overlay base
     version: int = SCRIPT_VERSION
 
@@ -667,6 +674,8 @@ class MoshScript:
         # default-encoder scripts stay loadable by pre-encoder builds
         if self.encoder != "mpeg4":
             d["encoder"] = self.encoder
+        if not self.checkpoint:
+            d["checkpoint"] = False
         d["base_config"] = {
             k: list(v) if isinstance(v, tuple) else v
             for k, v in self.base_config.items()
@@ -871,7 +880,7 @@ def run_script(script, *, progress=None):
         if vout:
             last_v = vout[-1]
         prev_donor = capture
-        if template_header is not None:
+        if script.checkpoint and template_header is not None:
             write_avi(output, template_header, template_movi_start, out_chunks)
 
     if os.path.exists(temp):
@@ -882,6 +891,9 @@ def run_script(script, *, progress=None):
 
     if template_header is None:
         raise RuntimeError("no entry produced any frames; nothing written")
+    # the unconditional final write: with checkpoint=True it refreshes the last
+    # checkpoint; with checkpoint=False it is the only write
+    write_avi(output, template_header, template_movi_start, out_chunks)
 
     logger.info(
         f"wrote {output} ({len(out_chunks)} movi chunks, "
