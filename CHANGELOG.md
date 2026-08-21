@@ -26,6 +26,13 @@ First public release.
 - Progress: `chroma_databend`, `pixel_sort`, and `make_moshable` accept the
   same `progress(frac, msg)` callback as `run_mosh`/`run_script`; the UI shows
   sub-progress during post-effects.
+- Plugin API: `pip install datamosh-someeffect` makes its ops usable in
+  MoshScript JSON automatically via the `datamosh.ops` entry-point group,
+  discovered lazily on the first unknown op name. `register_op`, `Op`,
+  `OpContext`, and `load_plugin_ops` are now exported from `datamosh`; plugin
+  op names must be dot-prefixed (`"wobble.stutter"`), and two distributions
+  claiming the same name is a hard error. CONTRIBUTING.md has a complete
+  minimal plugin.
 
 - Byte-level mosh engine over RIFF/AVI chunk lists (`parse_avi` / `write_avi`):
   keyframe deletion, P-frame duplication and reordering, motion transplant,

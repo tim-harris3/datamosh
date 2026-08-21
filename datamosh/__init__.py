@@ -62,8 +62,12 @@ from .script import (
     Entry,
     FrameQuota,
     MoshScript,
+    Op,
+    OpContext,
     Reorder,
     Transplant,
+    load_plugin_ops,
+    register_op,
     run_script,
 )
 from .sections import (
@@ -114,6 +118,10 @@ __all__ = [
     "MoshScript",
     "Entry",
     "run_script",
+    "Op",
+    "OpContext",
+    "register_op",
+    "load_plugin_ops",
     "ClassicMosh",
     "DeleteKeyframe",
     "DupFrames",

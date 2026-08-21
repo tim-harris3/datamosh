@@ -304,6 +304,16 @@ section of an existing moshable AVI — no re-encode, the most reproducible), or
 granular-stretched to the final video duration and interleaved automatically at
 the end of every entry, so ops never deal with interleaving.
 
+**Plugin ops:** installed packages can add ops via the `datamosh.ops`
+entry-point group (see CONTRIBUTING.md for a complete minimal plugin). Plugins
+load lazily — on the first op name `Op.from_dict` doesn't recognize — so
+built-in-only scripts never pay the import cost (`load_plugin_ops()` forces it
+eagerly for tooling). Plugin op names must be dot-prefixed
+(`"wobble.stutter"`); built-ins never are, and two distributions claiming the
+same name is a hard `RuntimeError`, not first-wins. Plugin authors should
+touch only the stable `OpContext` surface: `frames`, `audio`, `entry_index`,
+`base_config`, `keep_keyframe_default`, and `rng_for`.
+
 **JSON round-trip:** `script.save(path)` / `MoshScript.load(path)` — the saved
 file *is* the recipe. Unknown op names, op fields, entry fields, and version
 mismatches all raise with the valid alternatives listed. Explicit ops
