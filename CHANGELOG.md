@@ -4,6 +4,12 @@
 
 First public release.
 
+- Export: `datamosh export <src> [dst] [--to mp4|webm|gif]` (and
+  `datamosh.export()`) transcodes a moshed AVI into something shareable —
+  H.264/AAC mp4 with `+faststart`, VP9/Opus webm, or a palette-optimized gif
+  (`--fps`/`--width` caps, `--loop`). The corrupt AVI is decoded directly, and
+  `--start`/`--duration` trim output-side so the lying index of a moshed file
+  is never fast-seeked. Format is inferred from the destination extension.
 - CLI verbs: `datamosh prepare <src>` pre-encodes a moshable AVI (seeded
   keyframe layout, default `output/<name>_moshable.avi`) and
   `datamosh inspect <file.avi> [--json]` lists its keyframe sections — the

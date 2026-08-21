@@ -85,7 +85,7 @@ def test_flat_form_help_still_lists_config_flags(capsys):
     out = capsys.readouterr().out
     assert "--source" in out and "--preset" in out
     # the epilog advertises the verbs
-    assert "prepare" in out and "inspect" in out
+    assert "prepare" in out and "inspect" in out and "export" in out
 
 
 def test_mosh_verb_help_is_the_flat_parser(capsys):

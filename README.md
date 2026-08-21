@@ -69,6 +69,16 @@ datamosh prepare media/sample.avi --gap 0.5 1.0 --seed 5
 datamosh inspect output/sample_moshable.avi          # add --json for machines
 ```
 
+**Sharing your mosh** — moshed AVIs confuse most players, so `export` turns one
+into an mp4, webm, or gif. It decodes the corrupt bytes directly: the export is
+a faithful recording of how ffmpeg plays the glitch.
+
+```sh
+datamosh export output/run.avi                       # mp4 next to the source
+datamosh export output/run.avi --to gif --width 480  # looping gif
+datamosh export output/run.avi clip.webm --start 4 --duration 6
+```
+
 **Recipe** (the copy-and-tweak workflow — start here if you want scripts):
 
 ```sh
