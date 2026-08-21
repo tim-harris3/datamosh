@@ -38,6 +38,7 @@ from .effects import (
     stretch_audio,
     transplant_pframes,
 )
+from .export import EXPORT_FORMATS, export
 from .log import disable_console_logging, enable_console_logging
 from .pipeline import run_mosh
 from .pixelsort import PIXELSORT_KEYS, PIXELSORT_MODES, pixel_sort
@@ -138,6 +139,8 @@ __all__ = [
     "example_section_pool",
     "replace_sections",
     "delete_tagged_keyframes",
+    "export",
+    "EXPORT_FORMATS",
     "cli",
     "ffmpeg",
     "paths",

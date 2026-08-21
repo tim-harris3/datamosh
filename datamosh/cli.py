@@ -8,7 +8,8 @@ dataclass, so every script's CLI stays in sync with the config automatically.
 
 main() is the installed `datamosh` command (and what mosh.py at the project root
 runs). It dispatches on the first token -- `datamosh prepare` pre-encodes a
-moshable AVI, `datamosh inspect` lists its keyframe sections -- and anything
+moshable AVI, `datamosh inspect` lists its keyframe sections, `datamosh export`
+transcodes a mosh into a shareable mp4/webm/gif -- and anything
 else falls through to the original mosh form (every MoshConfig setting as a
 flag, --preset to start from presets.json), so `datamosh --source ...` keeps
 working unchanged.
@@ -20,6 +21,7 @@ import random
 import sys
 from dataclasses import fields, replace
 from pathlib import Path
+from subprocess import CalledProcessError
 
 from . import paths, presets
 from .config import MoshConfig, float_fields, range_fields, tunable_fields
@@ -136,7 +138,8 @@ def _cmd_mosh(argv):
         prog="datamosh",
         description="Shot-based datamosher (re-extracts shots from the source video).",
         epilog="other verbs: `datamosh prepare` pre-encodes a moshable AVI, "
-        "`datamosh inspect` lists its keyframe sections (each has its own --help)",
+        "`datamosh inspect` lists its keyframe sections, `datamosh export` "
+        "transcodes a mosh into a shareable mp4/webm/gif (each has its own --help)",
     )
     add_config_args(ap)
     args = ap.parse_args(argv)
@@ -233,12 +236,97 @@ def _cmd_inspect(argv):
         print("! keyframe count != 1; MoshScript entries auto-demote extra keyframes")
 
 
-VERBS = {"mosh": _cmd_mosh, "prepare": _cmd_prepare, "inspect": _cmd_inspect}
+def _cmd_export(argv):
+    """`datamosh export`: transcode a moshed AVI into a shareable mp4/webm/gif.
+    The corrupt bytes are decoded directly -- the export is a faithful recording
+    of how ffmpeg plays the glitch."""
+    from .export import EXPORT_FORMATS, export
+
+    ap = argparse.ArgumentParser(
+        prog="datamosh export",
+        description="Transcode a (moshed) video into a shareable mp4, webm, or gif. "
+        "Trims are applied output-side, so moshed AVIs' lying indexes are never "
+        "fast-seeked and the glitch smear survives the cut.",
+    )
+    ap.add_argument("src", help="video to export (typically a moshed AVI)")
+    ap.add_argument(
+        "dst",
+        nargs="?",
+        default=None,
+        help="output path (default: next to SRC with the format's extension)",
+    )
+    ap.add_argument(
+        "--to",
+        dest="fmt",
+        choices=EXPORT_FORMATS,
+        default=None,
+        help="output format (default: inferred from DST's extension, else mp4)",
+    )
+    ap.add_argument(
+        "--fps",
+        type=float,
+        default=None,
+        metavar="F",
+        help="output frame rate (gif defaults to 15; mp4/webm keep the source rate)",
+    )
+    ap.add_argument(
+        "--width",
+        type=int,
+        default=None,
+        metavar="N",
+        help="output width in pixels, height follows (gif defaults to 480)",
+    )
+    ap.add_argument(
+        "--start",
+        default=None,
+        metavar="T",
+        help="start time -- seconds or ffmpeg time syntax like 0:12.5",
+    )
+    ap.add_argument(
+        "--duration",
+        default=None,
+        metavar="T",
+        help="length to keep -- seconds or ffmpeg time syntax",
+    )
+    ap.add_argument(
+        "--loop",
+        type=int,
+        default=0,
+        metavar="N",
+        help="gif loop count: 0 = forever, -1 = play once (default 0)",
+    )
+    ap.add_argument(
+        "--crf",
+        type=int,
+        default=None,
+        metavar="N",
+        help="quality override, lower = better (default: mp4 18, webm 32)",
+    )
+    args = ap.parse_args(argv)
+    export(
+        args.src,
+        args.dst,
+        args.fmt,
+        fps=args.fps,
+        width=args.width,
+        start=args.start,
+        duration=args.duration,
+        loop=args.loop,
+        crf=args.crf,
+    )
+
+
+VERBS = {
+    "mosh": _cmd_mosh,
+    "prepare": _cmd_prepare,
+    "inspect": _cmd_inspect,
+    "export": _cmd_export,
+}
 
 
 def main(argv=None):
     """The `datamosh` command: dispatch on the first token (mosh / prepare /
-    inspect); anything else is the flat mosh form, unchanged."""
+    inspect / export); anything else is the flat mosh form, unchanged."""
     from .log import enable_console_logging
 
     enable_console_logging()
@@ -249,5 +337,5 @@ def main(argv=None):
         verb = _cmd_mosh
     try:
         verb(argv)
-    except (RuntimeError, KeyError, ValueError) as e:
+    except (RuntimeError, KeyError, ValueError, CalledProcessError) as e:
         sys.exit(str(e))
