@@ -1,5 +1,6 @@
-"""Deterministic scripting: an ordered list of keyframe sections, each with
-explicit per-frame mosh instructions, executed by run_script().
+"""Deterministic scripting: an ordered list of source slices -- keyframe
+sections or exact frame ranges -- each with explicit per-frame mosh
+instructions, executed by run_script().
 
 Where run_mosh() rolls every effect decision from config probabilities and one
 global seed, a MoshScript says exactly what happens: entry 2 deletes its
@@ -46,7 +47,7 @@ from .effects import (
     transplant_pframes,
 )
 from .scenes import DEFAULT_AUDIO_VIDEO_RATIO, audio_video_ratio, extract_shot
-from .sections import split_sections
+from .sections import slice_frames, split_sections
 
 logger = logging.getLogger(__name__)
 
@@ -529,6 +530,11 @@ class Entry:
                            clean single-keyframe moshable AVI, like run_mosh)
       avi + section     -- the nth keyframe section of an existing moshable AVI
                            (split_sections; no re-encode, most reproducible)
+      avi + f0 + f1     -- video frames [f0, f1) of an existing moshable AVI
+                           (half-open, Python-style negatives resolved against
+                           the file's frame count; yields exactly f1-f0 frames
+                           before ops, no re-encode). A range not starting on a
+                           keyframe has none -- melt by design.
       chunks            -- a pre-split in-memory chunk list (advanced; not
                            JSON-serializable)
     """
@@ -538,6 +544,8 @@ class Entry:
     t1: float = None
     avi: str = None
     section: int = None
+    f0: int = None
+    f1: int = None
     chunks: list = None
     ops: list = field(default_factory=list)
     seed: int = None  # overrides the entry's derived rng stream
@@ -547,18 +555,33 @@ class Entry:
     def __post_init__(self):
         modes = [
             self.source is not None or self.t0 is not None or self.t1 is not None,
-            self.avi is not None or self.section is not None,
+            self.avi is not None
+            or self.section is not None
+            or self.f0 is not None
+            or self.f1 is not None,
             self.chunks is not None,
         ]
         if sum(modes) != 1:
             raise ValueError(
                 "Entry needs exactly one addressing mode: source+t0+t1, "
-                "avi+section, or chunks"
+                "avi+section, avi+f0+f1, or chunks"
             )
         if modes[0] and (self.source is None or self.t0 is None or self.t1 is None):
             raise ValueError("time-range entries need all of source, t0, t1")
-        if modes[1] and (self.avi is None or self.section is None):
-            raise ValueError("section entries need both avi and section")
+        if modes[1]:
+            by_frames = self.f0 is not None or self.f1 is not None
+            if self.section is not None and by_frames:
+                raise ValueError("avi entries take either section or f0+f1, not both")
+            if by_frames:
+                if self.avi is None or self.f0 is None or self.f1 is None:
+                    raise ValueError("frame-range entries need all of avi, f0, f1")
+                if self.f0 >= 0 and self.f1 >= 0 and self.f1 <= self.f0:
+                    raise ValueError(
+                        f"frame range [{self.f0}, {self.f1}) is empty "
+                        "(ranges are half-open: f1 must exceed f0)"
+                    )
+            elif self.avi is None or self.section is None:
+                raise ValueError("section entries need both avi and section")
         self.audio_grain = tuple(self.audio_grain)
         self.ops = [Op.from_dict(o) if isinstance(o, dict) else o for o in self.ops]
 
@@ -571,8 +594,10 @@ class Entry:
         d = {}
         if self.source is not None:
             d.update(source=self.source, t0=self.t0, t1=self.t1)
-        else:
+        elif self.section is not None:
             d.update(avi=self.avi, section=self.section)
+        else:
+            d.update(avi=self.avi, f0=self.f0, f1=self.f1)
         if self.seed is not None:
             d["seed"] = self.seed
         if self.audio_grain != (1, 3):
@@ -681,25 +706,32 @@ def _demote_extra_keyframes(video_chunks):
     return demoted
 
 
-def _materialize(entry, i, temp, section_cache, av_ratios):
+def _materialize(entry, i, temp, avi_cache, av_ratios):
     """Turn an entry into (header, movi_start, chunks, av_ratio); chunks are a
     fresh copy the ops may mutate freely."""
     if entry.chunks is not None:
         return None, None, [dict(c) for c in entry.chunks], DEFAULT_AUDIO_VIDEO_RATIO
     if entry.avi is not None:
         path = paths.resolve(entry.avi)
-        if path not in section_cache:
+        if path not in avi_cache:
             header, movi_start, chunks = parse_avi(path)
-            section_cache[path] = (header, movi_start, split_sections(chunks))
-        header, movi_start, sections = section_cache[path]
-        if not 0 <= entry.section < len(sections):
-            raise ValueError(
-                f"entry {i}: section {entry.section} out of range "
-                f"({os.path.basename(path)} has {len(sections)} sections)"
-            )
+            avi_cache[path] = (header, movi_start, chunks, split_sections(chunks))
+        header, movi_start, chunks, sections = avi_cache[path]
+        if entry.section is not None:
+            if not 0 <= entry.section < len(sections):
+                raise ValueError(
+                    f"entry {i}: section {entry.section} out of range "
+                    f"({os.path.basename(path)} has {len(sections)} sections)"
+                )
+            seg = sections[entry.section]
+        else:
+            try:
+                seg = slice_frames(chunks, entry.f0, entry.f1)
+            except ValueError as e:
+                raise ValueError(f"entry {i}: {e}") from e
         if path not in av_ratios:
             av_ratios[path] = audio_video_ratio(path)
-        return header, movi_start, [dict(c) for c in sections[entry.section]], av_ratios[path]
+        return header, movi_start, [dict(c) for c in seg], av_ratios[path]
     src = paths.resolve(entry.source)
     if not os.path.exists(src):
         raise RuntimeError(f"entry {i}: source not found: {src}")
@@ -735,7 +767,7 @@ def run_script(script, *, progress=None):
 
     base_config = from_mapping(script.base_config, base=MoshConfig())
     temp = os.path.join(os.path.dirname(output) or ".", ".mosh_script_tmp.avi")
-    section_cache = {}  # avi path -> (header, movi_start, sections)
+    avi_cache = {}  # avi path -> (header, movi_start, chunks, sections)
     av_ratios = {}  # source path -> audio chunks per video frame
     donor_cache = {}  # transplant avi path -> P-frame payloads
     donors = []  # per-entry genuine P-frame captures
@@ -746,7 +778,7 @@ def run_script(script, *, progress=None):
     for i, entry in enumerate(script.entries):
         try:
             header, movi_start, seg, av_ratio = _materialize(
-                entry, i, temp, section_cache, av_ratios
+                entry, i, temp, avi_cache, av_ratios
             )
         except (subprocess.CalledProcessError, ValueError) as e:
             logger.warning(f"[{i}] materialize failed ({e}); skipped")

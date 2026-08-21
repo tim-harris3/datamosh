@@ -84,6 +84,30 @@ def split_sections(chunks):
     return sections
 
 
+def slice_frames(chunks, f0, f1):
+    """Slice an interleaved chunk list to exactly the video frames [f0, f1).
+
+    Half-open and Python-style like list slicing: negative indices resolve
+    against the total video frame count, and the result holds exactly f1-f0
+    video chunks. Audio rides by interleave position, mirroring split_sections:
+    everything from the f0-th video chunk up to (but excluding) the f1-th comes
+    along, so boundary audio stays with the frames it was interleaved between.
+    An empty or out-of-range range raises ValueError naming the total. The
+    returned sub-list is uncopied -- callers that mutate must copy the chunks,
+    as MoshScript's materializer does for cached sections.
+    """
+    v_pos = [i for i, c in enumerate(chunks) if c["stream"] == "v"]
+    n = len(v_pos)
+    a = f0 + n if f0 < 0 else f0
+    b = f1 + n if f1 < 0 else f1
+    if not 0 <= a < b <= n:
+        raise ValueError(
+            f"frame range [{f0}, {f1}) is empty or out of range "
+            f"(has {n} video frames)"
+        )
+    return chunks[v_pos[a] : v_pos[b] if b < n else len(chunks)]
+
+
 def describe_sections(path):
     """Inventory a moshable AVI: file summary + one entry per keyframe section.
 

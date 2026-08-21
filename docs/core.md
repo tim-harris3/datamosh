@@ -297,12 +297,21 @@ can slip a second keyframe on hard scene cuts, so entries demote any non-leading
 keyframe to a P-flag right after parse (`demote_extra_keyframes=False` to keep
 them) — index 0 is reliably *the* keyframe.
 
-**Entries** address their section one of three ways: `source`+`t0`+`t1`
+**Entries** address their material one of four ways: `source`+`t0`+`t1`
 (extract_shot re-encode, like run_mosh), `avi`+`section` (the nth keyframe
-section of an existing moshable AVI — no re-encode, the most reproducible), or
-`chunks` (a pre-split in-memory list; not serializable). Audio is
-granular-stretched to the final video duration and interleaved automatically at
-the end of every entry, so ops never deal with interleaving.
+section of an existing moshable AVI — no re-encode, the most reproducible),
+`avi`+`f0`+`f1` (video frames `[f0, f1)` of an existing moshable AVI —
+half-open like a Python slice, negatives resolve against the file's frame
+count, and the entry yields exactly `f1-f0` frames before ops; pure list
+slicing of the parsed bytes, no re-encode), or `chunks` (a pre-split in-memory
+list; not serializable). A frame range that doesn't start on a keyframe has
+none — it melts over whatever precedes it, by design, and the stream-start
+warning fires if such an entry opens the output. There is deliberately no
+`source`+`f0`+`f1`: extract_shot seeks by time, which can't guarantee frame
+accuracy — for frame precision, run `make_moshable()` once and address the
+result with `f0`/`f1`. Audio is granular-stretched to the final video duration
+and interleaved automatically at the end of every entry, so ops never deal
+with interleaving.
 
 **Plugin ops:** installed packages can add ops via the `datamosh.ops`
 entry-point group (see CONTRIBUTING.md for a complete minimal plugin). Plugins
