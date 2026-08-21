@@ -21,6 +21,7 @@ another entry's randomness. Scripts round-trip to JSON via save()/load().
 
 import dataclasses
 import hashlib
+import importlib.metadata
 import json
 import logging
 import os
@@ -55,8 +56,90 @@ OP_REGISTRY = {}
 
 
 def register_op(cls):
+    """Class decorator: make an Op subclass usable in scripts by its `op` name.
+
+    Registration is what makes {"op": "..."} JSON resolve to the class in
+    Op.from_dict. Registering an existing name silently overwrites it --
+    deliberate for in-process experimentation (monkeypatching a built-in op in
+    a notebook); entry-point plugins go through load_plugin_ops, which turns
+    that same overwrite into a hard error.
+    """
     OP_REGISTRY[cls.op] = cls
     return cls
+
+
+PLUGIN_GROUP = "datamosh.ops"
+_plugins_loaded = False
+_plugin_errors = {}  # entry-point name -> error string, surfaced in unknown-op errors
+
+
+def load_plugin_ops():
+    """Discover and register ops from installed plugin packages (idempotent).
+
+    Scans the "datamosh.ops" entry-point group; loading an entry point imports
+    the plugin module, whose own @register_op calls do the registering. This
+    runs lazily on the first unknown op name in Op.from_dict, so built-in-only
+    scripts pay zero import cost -- call it eagerly when you need the full op
+    list up front (UI/tooling). Entry points load in (distribution, entry
+    point) name order, so registration is deterministic across environments.
+
+    Two rules are enforced on each entry point's newly registered names:
+
+    * Plugin op names must contain a "." (e.g. "wobble.stutter"). Built-ins
+      are never dotted -- that is a promise -- so a plugin can't shadow one.
+      Violations are unregistered and recorded, not fatal.
+    * An op name whose class *changed* means two distributions claimed it:
+      hard RuntimeError naming both. Silent divergence of what an op name
+      means across machines is the worst outcome for the determinism
+      contract, so collisions fail loudly rather than first-wins.
+
+    A plugin that crashes on import is recorded in _plugin_errors (and appended
+    to unknown-op KeyErrors, so a typo and a broken install look different) but
+    never takes down scripts that don't use it.
+    """
+    global _plugins_loaded
+    if _plugins_loaded:
+        return
+    # set immediately: a crashing plugin must not be re-imported on every miss
+    _plugins_loaded = True
+
+    def _sort_key(ep):
+        dist = getattr(ep, "dist", None)  # can be None on some importlib versions
+        return (dist.name if dist is not None else "", ep.name)
+
+    def _label(ep):
+        dist = getattr(ep, "dist", None)
+        return dist.name if dist is not None else f"entry point {ep.name!r}"
+
+    owners = {}  # op name -> distribution label that registered it
+    for ep in sorted(importlib.metadata.entry_points(group=PLUGIN_GROUP), key=_sort_key):
+        before = dict(OP_REGISTRY)
+        try:
+            ep.load()
+        except Exception as e:
+            OP_REGISTRY.clear()
+            OP_REGISTRY.update(before)  # drop anything a half-imported module left
+            _plugin_errors[ep.name] = f"{type(e).__name__}: {e}"
+            logger.warning(f"plugin {ep.name!r} failed to load: {e}")
+            continue
+        for name, cls in list(OP_REGISTRY.items()):
+            if before.get(name) is cls:
+                continue
+            if name in before:
+                raise RuntimeError(
+                    f"op name {name!r} is claimed by both "
+                    f"{owners.get(name, 'the datamosh built-ins')} and {_label(ep)}; "
+                    f"plugin op names must be unique"
+                )
+            if "." not in name:
+                del OP_REGISTRY[name]
+                _plugin_errors[ep.name] = (
+                    f"op name {name!r} lacks the required dot prefix "
+                    f"(plugin ops must be namespaced, e.g. 'wobble.stutter')"
+                )
+                logger.warning(f"plugin {ep.name!r}: {_plugin_errors[ep.name]}")
+                continue
+            owners[name] = _label(ep)
 
 
 def _derive_rng(script_seed, entry_key, tag, explicit_seed=None):
@@ -83,8 +166,20 @@ def _resolve_index(i, n, what="frame"):
 class OpContext:
     """Everything an op can see and mutate while its entry renders.
 
+    Stable plugin API (safe to rely on from third-party ops):
+
     frames -- the entry's video frames as [{"v": chunk, "key": bool}, ...]
     audio  -- the entry's audio chunk list (pre-stretch)
+    entry_index -- position of this entry in the script
+    base_config -- the script's MoshConfig overlay base
+    keep_keyframe_default -- whether this entry starts the output stream
+    rng_for(op_index, explicit_seed) -- the op's isolated random.Random. All
+        randomness must come from here, never the global random module --
+        byte-identical reruns are the contract, and a plugin that breaks it
+        is buggy.
+
+    Internal, may change between releases (executor plumbing): script_seed and
+    entry_key (use rng_for instead), donors, prev_donor, donor_cache, last_v.
     """
 
     def __init__(
@@ -120,8 +215,16 @@ class OpContext:
 
 @dataclass
 class Op:
-    """Base class for script ops. Subclasses set a class-level `op` name and
-    implement apply(ctx, op_index)."""
+    """Base class for script ops. The subclass contract:
+
+    * a class-level `op` name (the JSON "op" key; plugin ops must be
+      dot-prefixed, e.g. "wobble.stutter", built-ins never are);
+    * a dataclass body whose fields are all JSON-serializable -- that alone
+      makes the op round-trip through save()/load();
+    * apply(ctx, op_index) mutating ctx.frames / ctx.audio in place;
+    * if the op has randomness, an optional `seed: int = None` field fed to
+      ctx.rng_for(op_index, self.seed) -- never the global random module.
+    """
 
     def apply(self, ctx, op_index):
         raise NotImplementedError
@@ -141,9 +244,16 @@ class Op:
             raise KeyError(f"op entry missing 'op' name: {d}")
         opcls = OP_REGISTRY.get(name)
         if opcls is None:
-            raise KeyError(
-                f"unknown op {name!r}; valid ops: {', '.join(sorted(OP_REGISTRY))}"
-            )
+            load_plugin_ops()  # first miss: maybe it's a not-yet-loaded plugin op
+            opcls = OP_REGISTRY.get(name)
+        if opcls is None:
+            msg = f"unknown op {name!r}; valid ops: {', '.join(sorted(OP_REGISTRY))}"
+            if _plugin_errors:
+                failures = "; ".join(
+                    f"{ep}: {err}" for ep, err in sorted(_plugin_errors.items())
+                )
+                msg += f" (plugin load failures: {failures})"
+            raise KeyError(msg)
         valid = {f.name for f in dataclasses.fields(opcls)}
         unknown = set(d) - valid
         if unknown:

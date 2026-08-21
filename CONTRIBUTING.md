@@ -47,6 +47,45 @@ ruff check .    # lint (CI runs both on Linux, Windows, and macOS)
   automatically. Add a round-trip case to `tests/test_ops.py` (the registry
   test picks it up for free) and, if it has randomness, take a `seed` field and
   use `ctx.rng_for(op_index, self.seed)`.
+- **A plugin package**: ops can live outside this repo entirely — publish a
+  package that declares an entry point in the `datamosh.ops` group, and its
+  ops become usable in MoshScript JSON on any machine that has it installed.
+  A complete minimal plugin:
+
+  ```toml
+  # datamosh-wobble/pyproject.toml
+  [project]
+  name = "datamosh-wobble"
+  version = "0.1.0"
+  dependencies = ["datamosh"]
+
+  [project.entry-points."datamosh.ops"]
+  wobble = "datamosh_wobble"
+  ```
+
+  ```python
+  # datamosh_wobble.py
+  from dataclasses import dataclass
+  from datamosh import Op, register_op
+
+  @register_op
+  @dataclass
+  class Wobble(Op):
+      """Duplicate every nth frame once -- a stutter."""
+      op = "wobble.stutter"     # dot-prefixed: required for plugins
+      every: int = 4
+      seed: int = None          # randomness must come from ctx.rng_for
+
+      def apply(self, ctx, op_index):
+          rng = ctx.rng_for(op_index, self.seed)
+          ...
+  ```
+
+  Three rules: op names must be dot-prefixed (`prefix.name`; built-ins never
+  are, so you can't shadow one — two plugins claiming the same name is a hard
+  error), all randomness comes from `ctx.rng_for(op_index, self.seed)`, and
+  every dataclass field must be JSON-serializable. See the `OpContext`
+  docstring for which context fields are stable plugin API.
 - **A new recipe**: follow the checklist at the end of
   [docs/recipes.md](docs/recipes.md); keep it runnable against
   `media/sample.avi` so anyone can try it.
