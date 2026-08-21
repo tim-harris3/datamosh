@@ -11,7 +11,9 @@ random sections first.
 No footage handy? `python -m datamosh.sample` generates media/sample.avi.
 """
 
-from datamosh import MoshConfig, run_mosh
+from datamosh import MoshConfig, enable_console_logging, run_mosh
+
+enable_console_logging()  # recipes are CLI tools: show the per-clip render lines
 
 cfg = MoshConfig(
     source="media/sample.avi",  # any video; relative to the project folder

@@ -18,6 +18,8 @@ that way. No footage yet? `python -m datamosh.sample` generates a demo clip at
 
 Tips:
 
+- Every recipe starts with `enable_console_logging()` — that's what prints the
+  per-clip render lines. Keep it in your copies (the library is silent without it).
 - **Same seed = same result.** Keep the seed fixed while you tweak the other numbers,
   then change the seed to reroll the dice.
 - Every knob, its allowed range, and what it does:

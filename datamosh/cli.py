@@ -123,8 +123,10 @@ def config_from_args(args):
 
 def main():
     """The `datamosh` command: build a MoshConfig from flags and run the mosh."""
+    from .log import enable_console_logging
     from .pipeline import run_mosh
 
+    enable_console_logging()
     ap = argparse.ArgumentParser(
         prog="datamosh",
         description="Shot-based datamosher (re-extracts shots from the source video).",

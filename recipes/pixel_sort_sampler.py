@@ -19,7 +19,9 @@ Copy, rename, change the numbers, run:
     python recipes/your_copy.py    (venv active)
 """
 
-from datamosh import extract_shot, pixel_sort
+from datamosh import enable_console_logging, extract_shot, pixel_sort
+
+enable_console_logging()  # recipes are CLI tools: show the render lines
 
 SOURCE = "media/sample.avi"  # footage to sample from (generate with: python -m datamosh.sample)
 CLIP = "output/pixelsort_clip.avi"  # the shared demo clip every method sorts

@@ -11,11 +11,15 @@ example defaults to it; swap in your own footage whenever you're ready.
 """
 
 import argparse
+import logging
 import os
 import subprocess
 
 from . import paths
 from .ffmpeg import require_ffmpeg
+from .log import enable_console_logging
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_DEST = "media/sample.avi"
 SIZE, FPS, SEG_SECONDS = "640x360", 30, 4
@@ -52,11 +56,12 @@ def generate_sample(dest=DEFAULT_DEST):
         dest,
     ]
     subprocess.run(cmd, check=True)
-    print(f"wrote {dest} ({len(_SEGMENTS) * SEG_SECONDS}s demo clip)")
+    logger.info(f"wrote {dest} ({len(_SEGMENTS) * SEG_SECONDS}s demo clip)")
     return dest
 
 
 def main():
+    enable_console_logging()
     ap = argparse.ArgumentParser(
         prog="python -m datamosh.sample",
         description="Generate a copyright-free demo clip to mosh.",

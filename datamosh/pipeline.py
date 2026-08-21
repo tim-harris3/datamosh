@@ -6,6 +6,7 @@ mosh_segment(), and appends the result to a growing output AVI. See MoshConfig f
 every knob it reads.
 """
 
+import logging
 import os
 import random
 import subprocess
@@ -15,6 +16,8 @@ from .avi import parse_avi, write_avi
 from .config import MoshConfig, escalation_intensity
 from .effects import mosh_segment
 from .scenes import audio_video_ratio, build_scene_map, extract_shot
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_sequence(sequence, source):
@@ -33,7 +36,7 @@ def _normalize_sequence(sequence, source):
         if not os.path.exists(s):
             raise RuntimeError(f"sequence source not found: {s}")
     n_sources = len({s for s, _, _ in sequence})
-    print(
+    logger.info(
         f"sequence mode: {len(sequence)} sections from {n_sources} source(s) (user timeline)"
     )
     return sequence
@@ -60,7 +63,7 @@ def _weighted_shot_map(cfg, source, shots, progress):
     if sum(weights) == 0:
         weights = None
     eligible = sum(1 for d in durations if d >= cfg.min_shot)
-    print(
+    logger.info(
         f"source {os.path.basename(source)}: {len(shots)} shots over "
         f"{duration/60:.1f} min ({eligible} >= {cfg.min_shot}s, shortest {min(durations):.2f}s)"
     )
@@ -129,12 +132,12 @@ def run_mosh(cfg=None, *, shots=None, sequence=None, progress=None):
             extract_shot(clip_src, t0, dur, temp)
             clip_header, clip_movi_start, seg = parse_avi(temp)
         except (subprocess.CalledProcessError, ValueError) as e:
-            print(f"[{i}] extract {t0:.1f}s failed ({e}); skipped")
+            logger.warning(f"[{i}] extract {t0:.1f}s failed ({e}); skipped")
             continue
         if template_header is None:
             template_header, template_movi_start = clip_header, clip_movi_start
         if not any(c["stream"] == "v" for c in seg):
-            print(f"[{i}] {t0:.1f}s +{dur:.2f}s: no video frames; skipped")
+            logger.warning(f"[{i}] {t0:.1f}s +{dur:.2f}s: no video frames; skipped")
             continue
 
         keep = len(out_chunks) == 0  # first-ever frames need a valid start
@@ -154,7 +157,7 @@ def run_mosh(cfg=None, *, shots=None, sequence=None, progress=None):
         key_deleted = sum(1 for c in seg if c["stream"] == "v" and c["key"]) > sum(
             1 for c in moshed if c["stream"] == "v" and c["key"]
         )
-        print(
+        logger.info(
             f"[{i}] {t0/60:.1f}min +{dur:.2f}s: {v_in}->{v_out} vframes, "
             f"keyframe {'deleted' if key_deleted else 'kept'}"
         )
@@ -170,7 +173,7 @@ def run_mosh(cfg=None, *, shots=None, sequence=None, progress=None):
         except OSError:
             pass  # transient Windows lock (AV scan); next run overwrites it anyway
 
-    print(
+    logger.info(
         f"wrote {output} ({len(out_chunks)} movi chunks, "
         f"{sum(1 for c in out_chunks if c['stream']=='v')} video frames)"
     )

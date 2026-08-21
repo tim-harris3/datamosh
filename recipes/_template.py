@@ -7,7 +7,9 @@ Most lines are commented out -- a commented line just means "use the default".
 Ranges are (low, high) pairs; a fresh amount inside the range is rolled each time.
 """
 
-from datamosh import MoshConfig, run_mosh
+from datamosh import MoshConfig, enable_console_logging, run_mosh
+
+enable_console_logging()  # recipes are CLI tools: show the per-clip render lines
 
 cfg = MoshConfig(
     # --- what / where / how much ---------------------------------------------

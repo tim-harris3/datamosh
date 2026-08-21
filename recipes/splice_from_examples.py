@@ -23,6 +23,7 @@ from datamosh import (
     MoshConfig,
     audio_video_ratio,
     delete_tagged_keyframes,
+    enable_console_logging,
     example_section_pool,
     ffmpeg,
     keyframe_shots,
@@ -33,6 +34,8 @@ from datamosh import (
     run_mosh,
     write_avi,
 )
+
+enable_console_logging()  # recipes are CLI tools: show the per-pass render lines
 
 SOURCE = "media/sample.avi"  # footage to mosh (python -m datamosh.sample)
 EXAMPLES = "media/examples"  # folder of AVIs to steal sections from

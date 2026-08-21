@@ -11,6 +11,8 @@ Everything importable from the submodules is re-exported here, so recipes never
 need to know which module a function lives in.
 """
 
+import logging as _logging
+
 from . import cli, ffmpeg, paths, presets, sections
 from .avi import parse_avi, write_avi
 from .chroma import CHROMA_MODES, chroma_databend
@@ -36,6 +38,7 @@ from .effects import (
     stretch_audio,
     transplant_pframes,
 )
+from .log import disable_console_logging, enable_console_logging
 from .pipeline import run_mosh
 from .pixelsort import PIXELSORT_KEYS, PIXELSORT_MODES, pixel_sort
 from .scenes import (
@@ -72,8 +75,15 @@ from .sections import (
     split_sections,
 )
 
+# Library etiquette: a NullHandler keeps `import datamosh` silent until an app
+# opts in (enable_console_logging() or its own logging config). It does not
+# block propagation, so embedders' root handlers still see every record.
+_logging.getLogger(__name__).addHandler(_logging.NullHandler())
+
 __all__ = [
     "MoshConfig",
+    "enable_console_logging",
+    "disable_console_logging",
     "run_mosh",
     "describe",
     "escalation_intensity",

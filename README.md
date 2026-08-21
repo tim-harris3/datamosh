@@ -103,6 +103,11 @@ Key ideas:
   `output/cache/` — then every later run is fast.
 - Adding a tunable to `datamosh/config.py` automatically gives it a CLI flag and a
   UI slider; the bounds/help text live on the config field.
+- **The library is silent by default.** It logs through the `logging` module
+  (logger `"datamosh"`); scripts call `datamosh.enable_console_logging()` for the
+  friendly per-clip render lines (every bundled recipe does), and embedders route
+  `logging.getLogger("datamosh")` however they like. Long operations accept a
+  `progress(frac, msg)` callback.
 
 Going deeper:
 

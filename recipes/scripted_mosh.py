@@ -22,8 +22,11 @@ from datamosh import (
     MoshScript,
     Reorder,
     Transplant,
+    enable_console_logging,
     run_script,
 )
+
+enable_console_logging()  # recipes are CLI tools: show the per-entry render lines
 
 SOURCE = "media/sample.avi"
 

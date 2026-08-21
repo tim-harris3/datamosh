@@ -13,11 +13,14 @@ red / green / blue); different combinations give anything from subtle streaking 
 the highlights to full-frame venetian-blind melts.
 """
 
+import logging
 import random
 
 import numpy as np
 
 from . import ffmpeg, paths
+
+logger = logging.getLogger(__name__)
 
 PIXELSORT_MODES = ["threshold", "bright", "dark", "bands", "full"]
 PIXELSORT_KEYS = ["luma", "sat", "hue", "red", "green", "blue"]
@@ -115,6 +118,7 @@ def pixel_sort(
     fps=None,
     seed=None,
     keep_audio=True,
+    progress=None,
 ):
     """Decode `src`, pixel-sort a fraction of its frames, and write a mosh-ready AVI to `dst`.
 
@@ -187,6 +191,8 @@ def pixel_sort(
         fps=fps,
         keep_audio=keep_audio,
         extra_out_flags=("-pix_fmt", "yuv420p"),
+        progress=progress,
+        total_frames=max(1, round(ffmpeg.duration(src) * fps)),
     )
-    print(f"pixelsort {mode}/{key}/{direction}: {n_hit}/{n_frames} frames -> {dst}")
+    logger.info(f"pixelsort {mode}/{key}/{direction}: {n_hit}/{n_frames} frames -> {dst}")
     return dst

@@ -30,6 +30,7 @@ from collections import Counter
 from datamosh import (
     MoshConfig,
     chroma_databend,
+    enable_console_logging,
     ffmpeg,
     make_moshable,
     mosh_segment,
@@ -39,6 +40,8 @@ from datamosh import (
     split_sections,
     write_avi,
 )
+
+enable_console_logging()  # recipes are CLI tools: show the render lines
 
 if len(sys.argv) < 4:
     sys.exit("usage: python recipes/beat_mosh.py <clips_folder> <song> <bpm> [out.mp4]")
