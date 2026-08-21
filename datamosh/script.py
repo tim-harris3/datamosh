@@ -22,6 +22,7 @@ another entry's randomness. Scripts round-trip to JSON via save()/load().
 import dataclasses
 import hashlib
 import json
+import logging
 import os
 import random
 import subprocess
@@ -45,6 +46,8 @@ from .effects import (
 )
 from .scenes import DEFAULT_AUDIO_VIDEO_RATIO, audio_video_ratio, extract_shot
 from .sections import split_sections
+
+logger = logging.getLogger(__name__)
 
 SCRIPT_VERSION = 1
 
@@ -269,7 +272,7 @@ class Transplant(Op):
                 )
             payloads = ctx.donors[j]
         if not payloads:
-            print(
+            logger.warning(
                 f"  transplant: no donor P-frames available (entry {ctx.entry_index}); skipped"
             )
             return
@@ -636,7 +639,7 @@ def run_script(script, *, progress=None):
                 entry, i, temp, section_cache, av_ratios
             )
         except (subprocess.CalledProcessError, ValueError) as e:
-            print(f"[{i}] materialize failed ({e}); skipped")
+            logger.warning(f"[{i}] materialize failed ({e}); skipped")
             donors.append([])
             prev_donor = None
             continue
@@ -646,14 +649,14 @@ def run_script(script, *, progress=None):
         video = [c for c in seg if c["stream"] == "v"]
         audio = [c for c in seg if c["stream"] == "a"]
         if not video:
-            print(f"[{i}] no video frames; skipped")
+            logger.warning(f"[{i}] no video frames; skipped")
             donors.append([])
             prev_donor = None
             continue
         if entry.demote_extra_keyframes:
             demoted = _demote_extra_keyframes(video)
             if demoted:
-                print(f"[{i}] demoted {demoted} extra keyframe(s)")
+                logger.info(f"[{i}] demoted {demoted} extra keyframe(s)")
 
         # capture genuine motion before any op can overwrite it
         capture = [c["data"] for c in video if not c["key"]]
@@ -682,8 +685,8 @@ def run_script(script, *, progress=None):
                 raise type(e)(f"entry {i}, op {j} ({op.op}): {e}") from e
 
         if stream_start and (not ctx.frames or not ctx.frames[0]["key"]):
-            print(
-                f"[{i}] WARNING: output starts without a keyframe -- most players "
+            logger.warning(
+                f"[{i}] output starts without a keyframe -- most players "
                 "will show garbage until the first keyframe (honoring the script)"
             )
 
@@ -699,7 +702,7 @@ def run_script(script, *, progress=None):
             )
         moshed = interleave(vout, aout)
 
-        print(
+        logger.info(
             f"[{i}] {len(video)}->{len(vout)} vframes, "
             f"{len(entry.ops)} op(s), keyframe "
             f"{'kept' if any(f['key'] for f in ctx.frames) else 'gone'}"
@@ -723,7 +726,7 @@ def run_script(script, *, progress=None):
     if template_header is None:
         raise RuntimeError("no entry produced any frames; nothing written")
 
-    print(
+    logger.info(
         f"wrote {output} ({len(out_chunks)} movi chunks, "
         f"{sum(1 for c in out_chunks if c['stream']=='v')} video frames)"
     )

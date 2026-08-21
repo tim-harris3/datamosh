@@ -5,11 +5,14 @@ ffmpeg and ffprobe must be installed and on PATH -- require_ffmpeg() gives a
 friendly error instead of a traceback when they are not.
 """
 
+import logging
 import os
 import shutil
 import subprocess
 
 from . import paths
+
+logger = logging.getLogger(__name__)
 
 # The one true encode shape for moshable AVIs: native mpeg4 (MPEG-4 ASP, no Xvid
 # packed bitstream), a single keyframe unless forced otherwise, no B-frames, and
@@ -240,11 +243,41 @@ def fixup(path):
             ],
             check=True,
         )
-        print(f"wrote {fixed}")
+        logger.info(f"wrote {fixed}")
         return fixed
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"ffmpeg fixup skipped: {e}")
+        logger.warning(f"ffmpeg fixup skipped: {e}")
         return None
+
+
+def run_encode(cmd, *, progress=None, total_seconds=None):
+    """Run an ffmpeg encode command, optionally reporting progress.
+
+    With progress and total_seconds set, `-nostats -progress pipe:1` is appended
+    and out_time lines from ffmpeg's progress stream drive progress(frac, msg);
+    otherwise this is plain subprocess.run. Either way a nonzero exit raises
+    CalledProcessError (stderr passes through to the console).
+    """
+    if not (progress and total_seconds and total_seconds > 0):
+        subprocess.run(cmd, check=True)
+        return
+    cmd = [*cmd[:-1], "-nostats", "-progress", "pipe:1", cmd[-1]]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
+    try:
+        for line in proc.stdout:
+            key, _, val = line.strip().partition("=")
+            if key in ("out_time_us", "out_time_ms") and val.isdigit():
+                secs = int(val) / 1e6  # both keys are microseconds in practice
+                progress(
+                    min(secs / total_seconds, 1.0),
+                    f"encode {secs:.0f}s/{total_seconds:.0f}s",
+                )
+    finally:
+        if proc.stdout:
+            proc.stdout.close()
+        proc.wait()
+    if proc.returncode:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
 
 
 def read_exact(stream, n):
@@ -270,6 +303,8 @@ def stream_transform(
     fps,
     keep_audio=True,
     extra_out_flags=(),
+    progress=None,
+    total_frames=None,
 ):
     """Stream src through a decode -> transform -> encode ffmpeg pipe pair.
 
@@ -282,6 +317,9 @@ def stream_transform(
     only). Returns the frame count. Raises CalledProcessError if either ffmpeg
     process fails -- a dead decoder would otherwise look like a clean early
     end-of-stream and silently truncate the output.
+
+    progress(frac, msg) is called every ~30 frames when total_frames is also
+    given (an estimate is fine -- it only drives a progress bar).
     """
     dec_cmd = [
         "ffmpeg",
@@ -332,6 +370,11 @@ def stream_transform(
                 break  # last partial read = end of stream
             n_frames += 1
             enc.stdin.write(transform(frame))
+            if progress and total_frames and n_frames % 30 == 0:
+                progress(
+                    min(n_frames / total_frames, 1.0),
+                    f"frame {n_frames}/{total_frames}",
+                )
     finally:
         if dec.stdout:
             dec.stdout.close()

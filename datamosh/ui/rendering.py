@@ -161,6 +161,7 @@ def _apply_post_effects(run_paths, seed, chroma_opts, sort_opts, progress):
                 planes=chroma_opts.planes,
                 frac=float(chroma_opts.frac),
                 seed=seed + CHROMA_SEED_OFFSET,
+                progress=lambda f, m: progress(0.90 + 0.04 * f, desc=m),
             )
             cur = run_paths.chroma_avi
         stage = "pixel sort post-effect"
@@ -177,6 +178,7 @@ def _apply_post_effects(run_paths, seed, chroma_opts, sort_opts, progress):
                 hi=int(sort_opts.hi),
                 reverse=bool(sort_opts.reverse),
                 seed=seed + SORT_SEED_OFFSET,
+                progress=lambda f, m: progress(0.94 + 0.05 * f, desc=m),
             )
             cur = run_paths.sort_avi
     except (subprocess.CalledProcessError, ValueError, OSError) as e:

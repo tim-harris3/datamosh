@@ -12,7 +12,9 @@ Copy, rename, change the numbers, run:
     python recipes/your_copy.py    (venv active)
 """
 
-from datamosh import chroma_databend
+from datamosh import chroma_databend, enable_console_logging
+
+enable_console_logging()  # recipes are CLI tools: show the render lines
 
 chroma_databend(
     "media/sample.avi",  # source video (generate with: python -m datamosh.sample)

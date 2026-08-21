@@ -9,9 +9,12 @@ re-emits a mosh-ready single-keyframe AVI that run_mosh / mosh_segment can still
 mangle further.
 """
 
+import logging
 import random
 
 from . import ffmpeg, paths
+
+logger = logging.getLogger(__name__)
 
 CHROMA_MODES = ["databend", "shift", "invert", "bias", "gray", "swap"]
 
@@ -88,6 +91,7 @@ def chroma_databend(
     databend_bytes=(64, 512),
     shift_range=(-4000, 4000),
     bias_range=(-48, 48),
+    progress=None,
 ):
     """Decode `src`, corrupt ONLY its chroma (U/V) planes, and write a mosh-ready AVI to `dst`.
 
@@ -150,6 +154,8 @@ def chroma_databend(
         frame_size=ysize + 2 * csize,
         fps=fps,
         keep_audio=keep_audio,
+        progress=progress,
+        total_frames=max(1, round(ffmpeg.duration(src) * fps)),
     )
-    print(f"chroma {mode} on '{planes}': {n_hit}/{n_frames} frames -> {dst}")
+    logger.info(f"chroma {mode} on '{planes}': {n_hit}/{n_frames} frames -> {dst}")
     return dst

@@ -9,9 +9,9 @@ video's motion blooms over another's pixels.
 """
 
 import glob
+import logging
 import os
 import random
-import subprocess
 
 from . import ffmpeg, paths
 from .avi import parse_avi
@@ -19,8 +19,10 @@ from .config import escalation_intensity
 from .effects import mosh_segment
 from .scenes import DEFAULT_AUDIO_VIDEO_RATIO, bounds_to_shots
 
+logger = logging.getLogger(__name__)
 
-def make_moshable(src, dst, gap_range=(0.2, 10.0), duration=None):
+
+def make_moshable(src, dst, gap_range=(0.2, 10.0), duration=None, progress=None):
     """Re-encode src to MPEG-4 ASP AVI with keyframes only at random timestamps.
 
     Same encode shape as extract_shot (native mpeg4, no B-frames, cfr, AC3) but instead
@@ -28,6 +30,8 @@ def make_moshable(src, dst, gap_range=(0.2, 10.0), duration=None):
     timestamp; `-g 999999 -sc_threshold 0` suppress all others. Audio is forced to 48 kHz
     stereo AC3 so its chunks match other moshable AVIs' audio and sections interleave
     into one decodable stream after splicing.
+
+    progress(frac, msg) is called as the encode advances (via ffmpeg -progress).
     """
     src, dst = paths.resolve(src), paths.resolve(dst)
     total = ffmpeg.duration(src)
@@ -53,8 +57,8 @@ def make_moshable(src, dst, gap_range=(0.2, 10.0), duration=None):
         "avi",
         dst,
     ]
-    subprocess.run(cmd, check=True)
-    print(f"moshable: {dst} ({len(times)} random keyframes over {total:.1f}s)")
+    ffmpeg.run_encode(cmd, progress=progress, total_seconds=total)
+    logger.info(f"moshable: {dst} ({len(times)} random keyframes over {total:.1f}s)")
     return dst
 
 
@@ -99,7 +103,7 @@ def mosh_pass(cfg, chunks, label="mosh pass", av_ratio=DEFAULT_AUDIO_VIDEO_RATIO
         out.extend(moshed)
     v_in = sum(1 for c in chunks if c["stream"] == "v")
     v_out = sum(1 for c in out if c["stream"] == "v")
-    print(f"{label}: {n_sections} sections, {v_in}->{v_out} vframes")
+    logger.info(f"{label}: {n_sections} sections, {v_in}->{v_out} vframes")
     return out
 
 
@@ -145,7 +149,7 @@ def replace_sections(chunks, prob, pick, tag="spliced"):
             replaced += 1
         else:
             out.extend(sec)
-    print(f"splice: replaced {replaced}/{len(sections)} sections")
+    logger.info(f"splice: replaced {replaced}/{len(sections)} sections")
     return out
 
 
@@ -159,5 +163,5 @@ def delete_tagged_keyframes(chunks, frac, tag="spliced"):
         if c["stream"] == "v" and c["key"] and c.get(tag)
     ]
     kill = set(random.sample(key_idx, round(len(key_idx) * frac)))
-    print(f"delete: {len(kill)}/{len(key_idx)} spliced keyframes removed")
+    logger.info(f"delete: {len(kill)}/{len(key_idx)} spliced keyframes removed")
     return [c for i, c in enumerate(chunks) if i not in kill]
