@@ -622,13 +622,21 @@ class Entry:
 
 @dataclass
 class MoshScript:
-    """An ordered, JSON-serializable mosh timeline: entries + global settings."""
+    """An ordered, JSON-serializable mosh timeline: entries + global settings.
+
+    `encoder` sets the moshable encoder for every time-range (source+t0+t1)
+    entry's re-encode: same script + same encoder = same bytes *per
+    ffmpeg/libxvidcore build*. `avi`+`section` and `avi`+`f0`+`f1` entries never
+    re-encode, so they stay byte-exact regardless of the setting. (A per-entry
+    encoder override is future work.)
+    """
 
     entries: list = field(default_factory=list)
     output: str = "output/scripted.avi"
     seed: int = 0
     reset: bool = True
     fixup: bool = True
+    encoder: str = "mpeg4"  # serialized only when non-default
     base_config: dict = field(default_factory=dict)  # ClassicMosh overlay base
     version: int = SCRIPT_VERSION
 
@@ -648,18 +656,23 @@ class MoshScript:
         return self
 
     def to_dict(self):
-        return {
+        d = {
             "version": self.version,
             "output": self.output,
             "seed": self.seed,
             "reset": self.reset,
             "fixup": self.fixup,
-            "base_config": {
-                k: list(v) if isinstance(v, tuple) else v
-                for k, v in self.base_config.items()
-            },
-            "entries": [e.to_dict() for e in self.entries],
         }
+        # sparse, like Entry.audio_grain: old scripts load unchanged, and
+        # default-encoder scripts stay loadable by pre-encoder builds
+        if self.encoder != "mpeg4":
+            d["encoder"] = self.encoder
+        d["base_config"] = {
+            k: list(v) if isinstance(v, tuple) else v
+            for k, v in self.base_config.items()
+        }
+        d["entries"] = [e.to_dict() for e in self.entries]
+        return d
 
     @classmethod
     def from_dict(cls, d):
@@ -706,9 +719,10 @@ def _demote_extra_keyframes(video_chunks):
     return demoted
 
 
-def _materialize(entry, i, temp, avi_cache, av_ratios):
+def _materialize(entry, i, temp, avi_cache, av_ratios, encoder="mpeg4"):
     """Turn an entry into (header, movi_start, chunks, av_ratio); chunks are a
-    fresh copy the ops may mutate freely."""
+    fresh copy the ops may mutate freely. `encoder` only touches time-range
+    entries -- avi/chunks entries are already encoded bytes."""
     if entry.chunks is not None:
         return None, None, [dict(c) for c in entry.chunks], DEFAULT_AUDIO_VIDEO_RATIO
     if entry.avi is not None:
@@ -735,7 +749,7 @@ def _materialize(entry, i, temp, avi_cache, av_ratios):
     src = paths.resolve(entry.source)
     if not os.path.exists(src):
         raise RuntimeError(f"entry {i}: source not found: {src}")
-    extract_shot(src, entry.t0, entry.t1 - entry.t0, temp)
+    extract_shot(src, entry.t0, entry.t1 - entry.t0, temp, encoder=encoder)
     header, movi_start, chunks = parse_avi(temp)
     # av_ratio probed from the extracted moshable, not the original: extract_shot
     # re-encodes audio to AC3 which can silently resample (see run_mosh)
@@ -754,6 +768,7 @@ def run_script(script, *, progress=None):
     time-range entries) = byte-identical output.
     """
     ffmpeg.require_ffmpeg()
+    ffmpeg.require_encoder(script.encoder)  # fail fast, not on the first re-encode
     output = paths.resolve(script.output)
 
     if script.reset and os.path.exists(output):
@@ -778,7 +793,7 @@ def run_script(script, *, progress=None):
     for i, entry in enumerate(script.entries):
         try:
             header, movi_start, seg, av_ratio = _materialize(
-                entry, i, temp, avi_cache, av_ratios
+                entry, i, temp, avi_cache, av_ratios, encoder=script.encoder
             )
         except (subprocess.CalledProcessError, ValueError) as e:
             logger.warning(f"[{i}] materialize failed ({e}); skipped")

@@ -58,6 +58,7 @@ datamosh-ui        # or: python app.py
 ```sh
 datamosh --source media/sample.avi --n 10 --seed 5
 datamosh --preset "heavy bloom" --source media/sample.avi
+datamosh --source media/sample.avi --encoder xvid   # classic Xvid look (full ffmpeg builds)
 ```
 
 Two extra verbs close the scripting loop: `prepare` pre-encodes a moshable AVI

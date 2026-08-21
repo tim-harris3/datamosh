@@ -9,29 +9,55 @@ import logging
 import os
 import shutil
 import subprocess
+from functools import lru_cache
 
 from . import paths
 
 logger = logging.getLogger(__name__)
 
-# The one true encode shape for moshable AVIs: native mpeg4 (MPEG-4 ASP, no Xvid
-# packed bitstream), a single keyframe unless forced otherwise, no B-frames, and
-# `-fps_mode cfr` so every displayed frame is exactly one '00dc' chunk. Audio is
-# AC3 so its fixed-size chunks survive byte-level mangling.
-VIDEO_ENCODE_FLAGS = [
-    "-c:v",
-    "mpeg4",
-    "-qscale:v",
-    "4",
-    "-g",
-    "999999",
-    "-bf",
-    "0",
-    "-sc_threshold",
-    "0",
-    "-fps_mode",
-    "cfr",
-]
+# The moshable encoders: both emit MPEG-4 ASP, so their P-frames speak the same
+# bitstream and sections from either can splice into one decodable stream. The
+# only user-visible difference is the fourcc ('FMP4' vs 'xvid') and each
+# encoder's rate-control character.
+ENCODERS = ("mpeg4", "xvid")
+_ENCODER_CODECS = {"mpeg4": "mpeg4", "xvid": "libxvid"}
+
+
+def video_encode_flags(encoder="mpeg4"):
+    """The one true video encode shape for moshable AVIs, for the given encoder.
+
+    A single keyframe unless forced otherwise (`-g 999999 -sc_threshold 0`), no
+    B-frames, and `-fps_mode cfr` so every displayed frame is exactly one '00dc'
+    chunk. `-bf 0` also guarantees no Xvid packed bitstream: the libxvid wrapper
+    only enables packed mode when B-frames are in use, so the 1-chunk-per-frame
+    contract holds for both encoders. (`-sc_threshold` is inert for libxvid but
+    kept for a uniform flag shape.) Raises ValueError on an unknown encoder;
+    require_encoder() is the availability check.
+    """
+    codec = _ENCODER_CODECS.get(encoder)
+    if codec is None:
+        raise ValueError(
+            f"unknown encoder {encoder!r}; expected one of {', '.join(ENCODERS)}"
+        )
+    return [
+        "-c:v",
+        codec,
+        "-qscale:v",
+        "4",
+        "-g",
+        "999999",
+        "-bf",
+        "0",
+        "-sc_threshold",
+        "0",
+        "-fps_mode",
+        "cfr",
+    ]
+
+
+# the documented alias: the default (native mpeg4) flags, importable as before.
+# Audio is AC3 so its fixed-size chunks survive byte-level mangling.
+VIDEO_ENCODE_FLAGS = video_encode_flags("mpeg4")
 AUDIO_ENCODE_FLAGS = ["-c:a", "ac3", "-b:a", "192k"]
 
 DEFAULT_FPS = 30000 / 1001  # NTSC 29.97, the fallback frame rate
@@ -45,6 +71,46 @@ def require_ffmpeg():
             f"{' and '.join(missing)} not found. datamosh needs ffmpeg installed and on "
             "your PATH -- download it from https://ffmpeg.org/download.html (or "
             "`winget install ffmpeg`), then reopen your terminal."
+        )
+
+
+@lru_cache(maxsize=None)
+def have_libxvid():
+    """Whether this ffmpeg build ships the libxvid encoder (full builds do,
+    `-essentials` and many distro builds don't).
+
+    Detection parses the `ffmpeg -encoders` listing for a video-encoder line
+    naming libxvid -- `ffmpeg -h encoder=X` exits 0 even for unknown names, so
+    it is NOT a reliable probe. Cached: the build can't change mid-run.
+    """
+    try:
+        out = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-encoders"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    for line in out.splitlines():
+        cols = line.split()
+        if len(cols) >= 2 and cols[0].startswith("V") and cols[1] == "libxvid":
+            return True
+    return False
+
+
+def require_encoder(encoder):
+    """Raise a clear, actionable error if the chosen moshable encoder can't run."""
+    if encoder not in ENCODERS:
+        raise ValueError(
+            f"unknown encoder {encoder!r}; expected one of {', '.join(ENCODERS)}"
+        )
+    if encoder == "xvid" and not have_libxvid():
+        raise RuntimeError(
+            "encoder 'xvid' needs libxvid, and your ffmpeg build lacks it "
+            "(it ships in 'full' builds but not '-essentials' or many distro "
+            "builds) -- install a full build from https://ffmpeg.org/download.html "
+            "or use encoder='mpeg4'."
         )
 
 
@@ -303,6 +369,7 @@ def stream_transform(
     fps,
     keep_audio=True,
     extra_out_flags=(),
+    encoder="mpeg4",
     progress=None,
     total_frames=None,
 ):
@@ -310,7 +377,8 @@ def stream_transform(
 
     Decodes src to raw `pix_fmt` frames, calls transform(frame_bytes) -> frame_bytes
     on each complete frame (a short final read ends the stream), and encodes the
-    result to dst as a moshable '-f avi' with VIDEO_ENCODE_FLAGS + extra_out_flags.
+    result to dst as a moshable '-f avi' with video_encode_flags(encoder) +
+    extra_out_flags.
     No whole-clip buffering. Shared scaffolding for chroma_databend / pixel_sort.
 
     keep_audio pulls the audio track straight from src (the raw pipe carries video
@@ -354,7 +422,7 @@ def stream_transform(
     ]
     if keep_audio:
         enc_cmd += ["-i", src, "-map", "0:v:0", "-map", "1:a:0?", *AUDIO_ENCODE_FLAGS]
-    enc_cmd += [*VIDEO_ENCODE_FLAGS, *extra_out_flags, "-f", "avi", dst]
+    enc_cmd += [*video_encode_flags(encoder), *extra_out_flags, "-f", "avi", dst]
     enc = subprocess.Popen(
         enc_cmd,
         stdin=subprocess.PIPE,

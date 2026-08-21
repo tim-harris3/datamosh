@@ -17,6 +17,21 @@ needs_ffmpeg = pytest.mark.skipif(
 )
 
 
+def _have_libxvid():
+    if not HAVE_FFMPEG:
+        return False
+    from datamosh.ffmpeg import have_libxvid
+
+    return have_libxvid()
+
+
+HAVE_LIBXVID = _have_libxvid()
+
+needs_libxvid = pytest.mark.skipif(
+    not HAVE_LIBXVID, reason="ffmpeg build lacks the libxvid encoder"
+)
+
+
 @pytest.fixture(scope="session")
 def tiny_src(tmp_path_factory):
     """A 2-second 160x120 generated source clip (testsrc2 video + sine audio)."""

@@ -91,6 +91,7 @@ def run_mosh(cfg=None, *, shots=None, sequence=None, progress=None):
             "recipe, or generate a demo clip with `python -m datamosh.sample`"
         )
     ffmpeg.require_ffmpeg()
+    ffmpeg.require_encoder(cfg.encoder)  # fail fast, not on clip 1's encode
     if cfg.seed is not None:
         random.seed(cfg.seed)
 
@@ -129,7 +130,7 @@ def run_mosh(cfg=None, *, shots=None, sequence=None, progress=None):
             t0, t1 = random.choices(shots, weights=weights, k=1)[0]
         dur = t1 - t0
         try:
-            extract_shot(clip_src, t0, dur, temp)
+            extract_shot(clip_src, t0, dur, temp, encoder=cfg.encoder)
             clip_header, clip_movi_start, seg = parse_avi(temp)
         except (subprocess.CalledProcessError, ValueError) as e:
             logger.warning(f"[{i}] extract {t0:.1f}s failed ({e}); skipped")

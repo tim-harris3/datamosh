@@ -47,6 +47,11 @@ class MoshConfig:
         help="video file to extract shots from (absolute, or relative to the project root)",
     )
     output: str = structural("output/moshed_output.avi", help="output AVI path")
+    encoder: str = structural(
+        "mpeg4",
+        help="moshable video encoder: 'mpeg4' (native, always available) or "
+        "'xvid' (libxvid, needs a full ffmpeg build)",
+    )
     n: int = structural(10, help="segments appended per run")
     seed: int | None = structural(
         None, help="RNG seed; same seed = same result (None = different every run)"

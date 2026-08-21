@@ -22,14 +22,16 @@ from .scenes import DEFAULT_AUDIO_VIDEO_RATIO, bounds_to_shots
 logger = logging.getLogger(__name__)
 
 
-def make_moshable(src, dst, gap_range=(0.2, 10.0), duration=None, progress=None):
+def make_moshable(
+    src, dst, gap_range=(0.2, 10.0), duration=None, encoder="mpeg4", progress=None
+):
     """Re-encode src to MPEG-4 ASP AVI with keyframes only at random timestamps.
 
-    Same encode shape as extract_shot (native mpeg4, no B-frames, cfr, AC3) but instead
-    of a single leading keyframe, `-force_key_frames` plants one at each randomly-spaced
-    timestamp; `-g 999999 -sc_threshold 0` suppress all others. Audio is forced to 48 kHz
-    stereo AC3 so its chunks match other moshable AVIs' audio and sections interleave
-    into one decodable stream after splicing.
+    Same encode shape as extract_shot (mpeg4 or libxvid per `encoder`, no B-frames,
+    cfr, AC3) but instead of a single leading keyframe, `-force_key_frames` plants
+    one at each randomly-spaced timestamp; `-g 999999 -sc_threshold 0` suppress all
+    others. Audio is forced to 48 kHz stereo AC3 so its chunks match other moshable
+    AVIs' audio and sections interleave into one decodable stream after splicing.
 
     progress(frac, msg) is called as the encode advances (via ffmpeg -progress).
     """
@@ -45,7 +47,7 @@ def make_moshable(src, dst, gap_range=(0.2, 10.0), duration=None, progress=None)
     if duration:
         cmd += ["-t", f"{duration:.3f}"]
     cmd += [
-        *ffmpeg.VIDEO_ENCODE_FLAGS,
+        *ffmpeg.video_encode_flags(encoder),
         "-force_key_frames",
         ",".join(f"{x:.3f}" for x in times),
         *ffmpeg.AUDIO_ENCODE_FLAGS,

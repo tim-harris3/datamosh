@@ -32,11 +32,12 @@ ruff check .    # lint (CI runs both on Linux, Windows, and macOS)
    project's core promise — `tests/test_script_determinism.py` enforces it, and
    any new effect or op must keep it.
 2. **The moshable-AVI shape is a contract.** The byte engine assumes what
-   `extract_shot` / `make_moshable` emit: native MPEG-4 ASP (no packed
-   bitstream, no B-frames), CFR so one displayed frame = one `00dc` chunk, and
-   AC3 audio whose fixed-size chunks survive byte mangling. Changes to
-   `ffmpeg.VIDEO_ENCODE_FLAGS` / `AUDIO_ENCODE_FLAGS` ripple through everything
-   downstream — treat them as load-bearing.
+   `extract_shot` / `make_moshable` emit: MPEG-4 ASP (no packed bitstream, no
+   B-frames — for both the native `mpeg4` encoder and libxvid via
+   `encoder="xvid"` / `--encoder xvid`), CFR so one displayed frame = one
+   `00dc` chunk, and AC3 audio whose fixed-size chunks survive byte mangling.
+   Changes to `ffmpeg.video_encode_flags()` / `AUDIO_ENCODE_FLAGS` ripple
+   through everything downstream — treat them as load-bearing.
 
 ## Adding things
 

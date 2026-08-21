@@ -23,8 +23,9 @@ from dataclasses import fields, replace
 from pathlib import Path
 from subprocess import CalledProcessError
 
-from . import paths, presets
+from . import ffmpeg, paths, presets
 from .config import MoshConfig, float_fields, range_fields, tunable_fields
+from .ffmpeg import ENCODERS
 
 # structural fields whose flag passes the value straight through to the config
 # (reset/fixup are excluded: they're exposed as the inverted --append/--no-fixup)
@@ -56,6 +57,15 @@ def add_config_args(ap):
     )
     ap.add_argument(
         "--output", default=None, help=f"output AVI path (default {d.output})"
+    )
+    # structural fields don't auto-generate flags (only tunables do), so this one
+    # is by hand -- config_from_args reads every structural field off the args
+    ap.add_argument(
+        "--encoder",
+        choices=ENCODERS,
+        default=None,
+        help=f"moshable video encoder (default {d.encoder}); "
+        "xvid needs a full ffmpeg build with libxvid",
     )
     ap.add_argument(
         "--n",
@@ -186,14 +196,28 @@ def _cmd_prepare(argv):
         default=None,
         help="seed the keyframe layout (same seed = same keyframe layout)",
     )
+    ap.add_argument(
+        "--encoder",
+        choices=ENCODERS,
+        default="mpeg4",
+        help="moshable video encoder (default mpeg4); "
+        "xvid needs a full ffmpeg build with libxvid",
+    )
     args = ap.parse_args(argv)
+    ffmpeg.require_encoder(args.encoder)  # actionable error before the encode
     if args.seed is not None:
         random.seed(args.seed)
     out = args.output
     if out is None:
         paths.ensure_output_dirs()
         out = str(paths.OUTPUT_DIR / f"{Path(args.src).stem}_moshable.avi")
-    make_moshable(args.src, out, gap_range=tuple(args.gap), duration=args.duration)
+    make_moshable(
+        args.src,
+        out,
+        gap_range=tuple(args.gap),
+        duration=args.duration,
+        encoder=args.encoder,
+    )
 
 
 def _cmd_inspect(argv):
