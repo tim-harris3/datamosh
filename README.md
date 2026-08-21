@@ -60,6 +60,15 @@ datamosh --source media/sample.avi --n 10 --seed 5
 datamosh --preset "heavy bloom" --source media/sample.avi
 ```
 
+Two extra verbs close the scripting loop: `prepare` pre-encodes a moshable AVI
+once (skipping the slow re-encode on every run), and `inspect` lists its
+keyframe sections — the `(avi, index)` entries a `MoshScript` addresses:
+
+```sh
+datamosh prepare media/sample.avi --gap 0.5 1.0 --seed 5
+datamosh inspect output/sample_moshable.avi          # add --json for machines
+```
+
 **Recipe** (the copy-and-tweak workflow — start here if you want scripts):
 
 ```sh

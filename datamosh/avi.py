@@ -99,6 +99,44 @@ def parse_avi(path):
     return header_prefix, movi_data_start, chunks
 
 
+def header_info(header_prefix):
+    """Read {width, height, fps, codec} out of a parse_avi() header prefix.
+
+    Byte-level on purpose (same find/unpack_from style as _patch_header), so it
+    works on mangled AVIs that make ffprobe choke: avih carries dwWidth/dwHeight,
+    the 'vids' strh carries dwRate/dwScale (the exact CFR frame rate) and the
+    fccHandler codec tag; avih dwMicroSecPerFrame is the fps fallback.
+    """
+    h = header_prefix
+    width = height = 0
+    micro = 0
+    fps = 0.0
+    codec = ""
+
+    a = h.find(b"avih")
+    if a != -1:
+        micro = struct.unpack_from("<I", h, a + 8)[0]  # dwMicroSecPerFrame
+        width = struct.unpack_from("<I", h, a + 8 + 32)[0]  # dwWidth
+        height = struct.unpack_from("<I", h, a + 8 + 36)[0]  # dwHeight
+
+    s = h.find(b"strh")
+    while s != -1:
+        if h[s + 8 : s + 12] == b"vids":
+            codec = h[s + 12 : s + 16].decode("ascii", "replace").strip("\x00 ")
+            scale = struct.unpack_from("<I", h, s + 8 + 20)[0]  # dwScale
+            rate = struct.unpack_from("<I", h, s + 8 + 24)[0]  # dwRate
+            if scale and rate:
+                fps = rate / scale
+            break
+        s = h.find(b"strh", s + 4)
+
+    if not fps and micro:
+        fps = 1e6 / micro
+    if not fps:
+        fps = ffmpeg.DEFAULT_FPS
+    return {"width": width, "height": height, "fps": fps, "codec": codec}
+
+
 def _patch_header(
     header_prefix, movi_data_start, movi_size, video_frame_count, audio_frame_count
 ):

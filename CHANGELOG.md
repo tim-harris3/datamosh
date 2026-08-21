@@ -4,6 +4,13 @@
 
 First public release.
 
+- CLI verbs: `datamosh prepare <src>` pre-encodes a moshable AVI (seeded
+  keyframe layout, default `output/<name>_moshable.avi`) and
+  `datamosh inspect <file.avi> [--json]` lists its keyframe sections — the
+  `(avi, index)` entries `MoshScript` addresses — straight from the parsed
+  bytes, flagging sections whose keyframe count != 1. The flat
+  `datamosh --source ...` form is unchanged. New library helpers:
+  `datamosh.describe_sections()` and `datamosh.avi.header_info()`.
 - Logging: the library now logs through the standard `logging` module (logger
   `datamosh`, NullHandler attached) instead of printing. CLI, UI, and the
   bundled recipes opt into console output via the new

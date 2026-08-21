@@ -67,6 +67,7 @@ from .script import (
 )
 from .sections import (
     delete_tagged_keyframes,
+    describe_sections,
     example_section_pool,
     keyframe_shots,
     make_moshable,
@@ -132,6 +133,7 @@ __all__ = [
     "make_moshable",
     "keyframe_shots",
     "split_sections",
+    "describe_sections",
     "mosh_pass",
     "example_section_pool",
     "replace_sections",
