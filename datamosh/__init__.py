@@ -50,6 +50,7 @@ from .effects import (
 )
 from .export import EXPORT_FORMATS, export
 from .log import disable_console_logging, enable_console_logging
+from .mv import extract_mv_fields, mv_overlay
 from .pipeline import run_mosh
 from .pixelsort import PIXELSORT_KEYS, PIXELSORT_MODES, pixel_sort
 from .scenes import (
@@ -169,6 +170,8 @@ __all__ = [
     "delete_tagged_keyframes",
     "export",
     "EXPORT_FORMATS",
+    "extract_mv_fields",
+    "mv_overlay",
     "cli",
     "ffmpeg",
     "paths",

@@ -393,6 +393,28 @@ grid math never touches disk. A future `[beats]` extra can add
 `grid_from_beat_times()` onset detection behind the same
 `frame_at`/`quota`/`snap_units` interface.
 
+### mv.py — motion-vector analysis
+
+The read-only half of the motion-vector roadmap
+([docs/roadmap/motion-vector-effects.md](roadmap/motion-vector-effects.md),
+phase 2): look at the motion that drives a mosh, without touching the
+bitstream.
+
+- `extract_mv_fields(path, backend="auto")` — one float32 field of shape
+  `(mb_h, mb_w, 2)` per video frame: a `(vx, vy)` entry per 16×16 macroblock in
+  half-pel units (MPEG-4's own resolution). Keyframes and static/skipped blocks
+  read as zero; finer 8×8 vectors collapse into their macroblock by mean. The
+  `"probe"` backend reads the decoder's own exported vectors through ffprobe
+  side data (exact — but stock ffmpeg builds to date don't serialize them and
+  it fails with a clear error); `"estimate"` phase-correlates the decoded luma
+  per macroblock (works on every build, integer-pel, ±8 px reach); `"auto"`
+  probes and falls back.
+- `mv_overlay(src, dst)` — ffmpeg's `codecview` arrow overlay: every true
+  decoder vector drawn on every frame, the quick visual sanity check.
+- `datamosh mv-dump file.avi [--json out.json] [--frame N] [--overlay out.avi]`
+  — the CLI: a summary row per frame (moving macroblocks, mean |v|, dominant
+  compass direction) plus the raw fields as JSON for scripting.
+
 ### chroma.py and pixelsort.py — the decode-based effects
 
 Two effects can't work at the byte level, because what they touch only exists in

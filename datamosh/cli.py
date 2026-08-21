@@ -9,7 +9,8 @@ dataclass, so every script's CLI stays in sync with the config automatically.
 main() is the installed `datamosh` command (and what mosh.py at the project root
 runs). It dispatches on the first token -- `datamosh prepare` pre-encodes a
 moshable AVI, `datamosh inspect` lists its keyframe sections, `datamosh export`
-transcodes a mosh into a shareable mp4/webm/gif -- and anything
+transcodes a mosh into a shareable mp4/webm/gif, `datamosh mv-dump` summarizes
+per-frame motion-vector fields -- and anything
 else falls through to the original mosh form (every MoshConfig setting as a
 flag, --preset to start from presets.json), so `datamosh --source ...` keeps
 working unchanged.
@@ -149,7 +150,8 @@ def _cmd_mosh(argv):
         description="Shot-based datamosher (re-extracts shots from the source video).",
         epilog="other verbs: `datamosh prepare` pre-encodes a moshable AVI, "
         "`datamosh inspect` lists its keyframe sections, `datamosh export` "
-        "transcodes a mosh into a shareable mp4/webm/gif (each has its own --help)",
+        "transcodes a mosh into a shareable mp4/webm/gif, `datamosh mv-dump` "
+        "summarizes per-frame motion-vector fields (each has its own --help)",
     )
     add_config_args(ap)
     args = ap.parse_args(argv)
@@ -340,17 +342,89 @@ def _cmd_export(argv):
     )
 
 
+def _cmd_mv_dump(argv):
+    """`datamosh mv-dump`: per-frame motion-vector summary -- the roadmap's
+    analysis toolkit as a CLI. A table row per frame (moving macroblocks,
+    mean |v| in half-pels, dominant direction), the raw fields as JSON for
+    scripting, and the codecview arrow overlay for eyeballing."""
+    from . import mv
+
+    ap = argparse.ArgumentParser(
+        prog="datamosh mv-dump",
+        description="Summarize a video's per-frame motion-vector fields (16x16 "
+        "macroblock grid, half-pel units). Keyframes and static blocks read as "
+        "zero motion; directions are screen-space compass points (+y down = S).",
+    )
+    ap.add_argument("file", help="video to analyze (typically a moshable AVI)")
+    ap.add_argument(
+        "--json",
+        default=None,
+        metavar="PATH",
+        help="also dump the raw fields as JSON (nested lists, half-pel units)",
+    )
+    ap.add_argument(
+        "--frame",
+        type=int,
+        default=None,
+        metavar="N",
+        help="limit the table (and --json) to this frame index",
+    )
+    ap.add_argument(
+        "--overlay",
+        default=None,
+        metavar="PATH",
+        help="also render the codecview motion-vector arrow overlay to this AVI",
+    )
+    ap.add_argument(
+        "--backend",
+        choices=("auto", "probe", "estimate"),
+        default="auto",
+        help="probe = the decoder's exported vectors (exact; most ffmpeg builds "
+        "can't serialize them), estimate = phase correlation on decoded frames "
+        "(works everywhere), auto = probe when supported, else estimate",
+    )
+    args = ap.parse_args(argv)
+    fields = mv.extract_mv_fields(args.file, backend=args.backend)
+    indices = range(len(fields))
+    if args.frame is not None:
+        if not 0 <= args.frame < len(fields):
+            raise ValueError(
+                f"--frame {args.frame} out of range: {args.file} has {len(fields)} frames"
+            )
+        indices = [args.frame]
+    mb_h, mb_w = fields[0].shape[:2] if fields else (0, 0)
+    print(f"{len(fields)} frames, {mb_w}x{mb_h} macroblocks (half-pel units)")
+    print(f"{'frame':>5} {'moving':>6} {'mean|v|':>8} {'dir':>4}")
+    for i in indices:
+        s = mv.field_stats(fields[i])
+        print(f"{i:>5} {s['moving']:>6} {s['mean_mag']:>8.2f} {s['direction']:>4}")
+    if args.json:
+        payload = {
+            "file": args.file,
+            "unit": "half-pel",
+            "mb_size": mv.MB_SIZE,
+            "shape": [mb_h, mb_w],
+            "fields": [{"index": i, "field": fields[i].tolist()} for i in indices],
+        }
+        with open(args.json, "w") as fh:
+            json.dump(payload, fh)
+        print(f"wrote {args.json}")
+    if args.overlay:
+        mv.mv_overlay(args.file, args.overlay)
+
+
 VERBS = {
     "mosh": _cmd_mosh,
     "prepare": _cmd_prepare,
     "inspect": _cmd_inspect,
     "export": _cmd_export,
+    "mv-dump": _cmd_mv_dump,
 }
 
 
 def main(argv=None):
     """The `datamosh` command: dispatch on the first token (mosh / prepare /
-    inspect / export); anything else is the flat mosh form, unchanged."""
+    inspect / export / mv-dump); anything else is the flat mosh form, unchanged."""
     from .log import enable_console_logging
 
     enable_console_logging()
