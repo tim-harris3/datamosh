@@ -62,6 +62,14 @@ First public release.
   claiming the same name is a hard error. CONTRIBUTING.md has a complete
   minimal plugin.
 
+- Motion-vector analysis toolkit (roadmap phase 2): `datamosh/mv.py` —
+  `extract_mv_fields()` turns any clip into one numpy field per frame
+  (`(mb_h, mb_w, 2)` float32, half-pel units, one entry per 16×16 macroblock;
+  keyframes/static blocks zero), via the decoder's exported motion vectors
+  (ffprobe side data) where the build can serialize them, else a numpy
+  phase-correlation estimate over the decoded luma; `mv_overlay()` renders
+  ffmpeg's codecview arrow overlay; and the `datamosh mv-dump` verb
+  (`--json`, `--frame`, `--overlay`) prints a per-frame motion summary table.
 - Byte-level mosh engine over RIFF/AVI chunk lists (`parse_avi` / `write_avi`):
   keyframe deletion, P-frame duplication and reordering, motion transplant,
   databending, audio scramble/reverse/databend with granular time-stretch.
