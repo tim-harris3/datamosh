@@ -4,6 +4,19 @@
 
 First public release.
 
+- Beat-sync helpers: `datamosh/beat.py` promotes the beat_mosh recipe's grid
+  machinery into the library — `BeatGrid` (drift-free cumulative grid math:
+  boundaries telescope through `frame_at`, so cuts stay within half a frame
+  of true beat time over a whole song), `place_sections`, `SectionRef` /
+  `load_section_refs` (video-only frame counts), `cycle_shuffled` /
+  `section_pool`, and `entries_from_beats`, which turns a section pool into
+  MoshScript entries with `FrameQuota` appended last (policy — melts,
+  escalation, randomness — stays in the caller's `ops_for` and rng). Plus
+  `ffmpeg.mux_audio()` (song in as the only audio track of a final H.264/AAC
+  mp4) and `MoshScript.checkpoint=False` to skip the O(n²) per-entry output
+  rewrites on hundred-entry grids (same bytes; serialized only when False).
+  The recipe is now a thin policy layer that also saves its whole timeline as
+  a re-runnable script JSON.
 - Xvid encoder support: `encoder="xvid"` (or `--encoder xvid` on `datamosh` and
   `datamosh prepare`) encodes moshable AVIs with libxvid instead of native
   mpeg4 — the classic community-mosh encoder, same MPEG-4 ASP shape (`-bf 0`

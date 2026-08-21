@@ -457,6 +457,65 @@ def stream_transform(
     return n_frames
 
 
+def mux_audio(
+    video_src,
+    audio_src,
+    dst,
+    *,
+    audio_start=0.0,
+    crf=18,
+    preset="medium",
+    audio_bitrate="192k",
+):
+    """Mux `audio_src` in as the only audio track over `video_src`'s video --
+    the final-delivery H.264/AAC mp4 (the beat_mosh ending, as a primitive).
+
+    Any audio in `video_src` is dropped, `audio_start` seconds are skipped into
+    the audio file (so a song can start mid-track), and `-shortest` ends the
+    mix at the shorter stream. The video is re-encoded (crf/preset are x264's)
+    because a moshed AVI's deliberately-lying bytes don't survive `-c copy`
+    into mp4; `+faststart` makes the result stream-seekable.
+    """
+    dst = paths.resolve(dst)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            paths.resolve(video_src),
+            "-ss",
+            f"{audio_start:.3f}",
+            "-i",
+            paths.resolve(audio_src),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "libx264",
+            "-crf",
+            str(crf),
+            "-preset",
+            preset,
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            audio_bitrate,
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            dst,
+        ],
+        check=True,
+    )
+    return dst
+
+
 def transcode(src, dst, seconds=None):
     """Transcode to a browser-playable H.264/AAC MP4 (the UI preview encode).
 
