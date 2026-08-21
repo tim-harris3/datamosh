@@ -14,7 +14,7 @@ import os
 import random
 
 from . import ffmpeg, paths
-from .avi import parse_avi
+from .avi import header_info, parse_avi
 from .config import escalation_intensity
 from .effects import mosh_segment
 from .scenes import DEFAULT_AUDIO_VIDEO_RATIO, bounds_to_shots
@@ -82,6 +82,45 @@ def split_sections(chunks):
     if cur:
         sections.append(cur)
     return sections
+
+
+def describe_sections(path):
+    """Inventory a moshable AVI: file summary + one entry per keyframe section.
+
+    Byte-level truth for scripting: section indices are exactly the ones
+    split_sections defines and MoshScript's `(avi, section)` entries address,
+    and audio_chunks counts come straight from the parsed movi list. Start
+    times are cumulative frames / fps -- exact, because the moshable encode is
+    CFR. A section whose keyframe count != 1 usually means the mpeg4 encoder
+    slipped an extra keyframe on a hard cut (MoshScript auto-demotes those).
+    """
+    path = paths.resolve(path)
+    header_prefix, _, chunks = parse_avi(path)
+    info = header_info(header_prefix)
+    fps = info["fps"]
+
+    sections, frame_cursor = [], 0
+    for i, sec in enumerate(split_sections(chunks)):
+        frames = sum(1 for c in sec if c["stream"] == "v")
+        sections.append(
+            {
+                "index": i,
+                "start": frame_cursor / fps,
+                "duration": frames / fps,
+                "frames": frames,
+                "keyframes": sum(1 for c in sec if c["stream"] == "v" and c["key"]),
+                "audio_chunks": sum(1 for c in sec if c["stream"] == "a"),
+            }
+        )
+        frame_cursor += frames
+
+    return {
+        "path": path,
+        **info,
+        "frames": frame_cursor,
+        "duration": frame_cursor / fps,
+        "sections": sections,
+    }
 
 
 def mosh_pass(cfg, chunks, label="mosh pass", av_ratio=DEFAULT_AUDIO_VIDEO_RATIO):

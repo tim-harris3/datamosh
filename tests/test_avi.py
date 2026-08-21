@@ -3,6 +3,7 @@
 import pytest
 
 from datamosh import parse_avi, write_avi
+from datamosh.avi import header_info
 
 from .conftest import needs_ffmpeg
 
@@ -47,6 +48,15 @@ def test_rewrite_is_byte_stable(moshable, tmp_path):
     header2, movi_start2, chunks2 = parse_avi(str(a))
     write_avi(str(b), header2, movi_start2, chunks2)
     assert a.read_bytes() == b.read_bytes()
+
+
+@needs_ffmpeg
+def test_header_info_reads_moshable_header(moshable):
+    header, _, _ = parse_avi(moshable)
+    info = header_info(header)
+    assert (info["width"], info["height"]) == (160, 120)
+    assert info["fps"] == pytest.approx(15, abs=0.01)
+    assert info["codec"] == "FMP4"
 
 
 def test_parse_rejects_non_avi(tmp_path):
