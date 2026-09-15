@@ -37,6 +37,10 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Re-runs (and workflow_dispatch dry runs) shouldn't fail on
+          # files that already made it to PyPI.
+          skip-existing: true
 
   # Freezes the desktop app (PyInstaller) and compiles the Inno Setup
   # installer, bundling a pinned GPL ffmpeg so the result is self-contained.
