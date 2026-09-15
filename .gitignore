@@ -10,10 +10,6 @@ packaging/ffmpeg-bin/
 # local media and render output (never committed)
 media/
 output/
-8-14/
-8-18/
-beat test/
-them jawns clips/
 
 # personal recipes / notes kept out of the public repo
 recipes/private/

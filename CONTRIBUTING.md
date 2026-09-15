@@ -5,7 +5,7 @@ Bug reports, effect ideas, recipes, and pull requests are all welcome.
 ## Dev setup
 
 ```sh
-git clone https://github.com/tim-harris3/moshing
+git clone https://github.com/tim-harris3/datamosh
 cd moshing
 python -m venv .venv                 # py -m venv .venv on Windows
 source .venv/bin/activate            # .venv\Scripts\activate on Windows

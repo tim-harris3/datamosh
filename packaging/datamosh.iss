@@ -7,7 +7,7 @@
 #endif
 #define MyAppName "datamosh"
 #define MyAppExeName "datamosh.exe"
-#define MyAppURL "https://github.com/tim-harris3/moshing"
+#define MyAppURL "https://github.com/tim-harris3/datamosh"
 
 [Setup]
 ; Never change AppId between releases -- it is what makes an install an upgrade.

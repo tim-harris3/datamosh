@@ -39,9 +39,9 @@ datamosh = "datamosh.cli:main"
 datamosh-ui = "datamosh.ui.app:main"
 
 [project.urls]
-Homepage = "https://github.com/tim-harris3/moshing"
-Documentation = "https://github.com/tim-harris3/moshing/tree/master/docs"
-Issues = "https://github.com/tim-harris3/moshing/issues"
+Homepage = "https://github.com/tim-harris3/datamosh"
+Documentation = "https://github.com/tim-harris3/datamosh/tree/master/docs"
+Issues = "https://github.com/tim-harris3/datamosh/issues"
 
 [tool.setuptools]
 packages = ["datamosh", "datamosh.ui"]

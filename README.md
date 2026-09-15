@@ -7,6 +7,13 @@ one idea most moshing tools don't have: **determinism**. Every render is seeded,
 and a `MoshScript` is a JSON-serializable glitch timeline that reproduces
 byte-identically — you can save, share, and re-run the exact same mosh.
 
+<p align="center">
+  <img src="docs/assets/melt.gif" width="32%" alt="Tree canopy dissolving into blocky confetti">
+  <img src="docs/assets/shatter.gif" width="32%" alt="Riverside footage shattering into macroblock noise">
+  <img src="docs/assets/bloom.gif" width="32%" alt="Clean footage melting into a moshed graffiti wall">
+</p>
+<p align="center"><em>Cuts from <a href="https://www.youtube.com/watch?v=9eeUmYJ0db0">a mosh made with this toolkit</a> — click for the full video.</em></p>
+
 Three ways to use it, from easiest to most flexible:
 
 1. **The browser UI** — sliders, presets, a drag timeline, and a preview player.
