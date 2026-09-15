@@ -3,7 +3,7 @@
 ; build.ps1 -Installer does both and injects the version from pyproject.toml.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "0.1.0"
+  #error MyAppVersion not defined -- build via packaging\build.ps1 -Installer
 #endif
 #define MyAppName "datamosh"
 #define MyAppExeName "datamosh.exe"
