@@ -14,6 +14,16 @@
                 "uriFormat": "%s",
                 "action": "openExternally"
             }
+        },
+        {
+            "name": "Gradio: app.py (native window)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app.py",
+            "args": ["--window"],
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

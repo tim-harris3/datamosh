@@ -458,7 +458,7 @@ transform.
   `"media/sample.avi"` works no matter which directory you run from, and the
   best-effort `load_json()` / `save_json()` used for caches and presets.
 - **presets.py** — presets are plain dicts of MoshConfig field names → values.
-  Built-ins in `presets.json` (safe to hand-edit), user saves in
+  Built-ins ship as `datamosh/presets.json` inside the package, user saves in
   `output/user_presets.json` (shadow built-ins on name clash). A preset never
   sets `source`/`output`. `preset_config(name)` applies one via `from_mapping`.
 - **cli.py** — flag generation for `mosh.py`, driven by the tunable metadata.

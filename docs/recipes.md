@@ -66,7 +66,7 @@ Things worth knowing at this level:
   gives you a tweaked copy without repeating everything.
 - **Presets**: `from datamosh import presets` then
   `cfg = presets.preset_config("heavy bloom")` starts you from a named bundle
-  (see `presets.json`); it never touches `source`/`output`, so set those yourself.
+  (see `datamosh/presets.json`); it never touches `source`/`output`, so set those yourself.
 
 ## Level 2: your own shot map
 

@@ -12,7 +12,7 @@ moshable AVI, `datamosh inspect` lists its keyframe sections, `datamosh export`
 transcodes a mosh into a shareable mp4/webm/gif, `datamosh mv-dump` summarizes
 per-frame motion-vector fields -- and anything
 else falls through to the original mosh form (every MoshConfig setting as a
-flag, --preset to start from presets.json), so `datamosh --source ...` keeps
+flag, --preset to start from a builtin preset), so `datamosh --source ...` keeps
 working unchanged.
 """
 
@@ -48,7 +48,7 @@ def add_config_args(ap):
         "--preset",
         default=None,
         metavar="NAME",
-        help="start from a named preset (see presets.json); flags override it",
+        help="start from a named preset (see datamosh/presets.json); flags override it",
     )
     ap.add_argument(
         "--source",

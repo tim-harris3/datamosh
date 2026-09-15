@@ -5,6 +5,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+packaging/ffmpeg-bin/
 
 # local media and render output (never committed)
 media/
@@ -14,8 +15,10 @@ output/
 beat test/
 them jawns clips/
 
-# personal recipes kept out of the public repo
+# personal recipes / notes kept out of the public repo
 recipes/private/
+CLAUDE.local.md
+REVIEW.md
 
 # media files anywhere in the tree
 *.flac

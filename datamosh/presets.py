@@ -1,18 +1,20 @@
 """Preset loading and saving.
 
-Built-in presets live in presets.json at the project root (safe to edit by hand);
-presets you save from the UI go to output/user_presets.json so the shipped file is
-never touched. A preset is just a dict of MoshConfig field names -> values; it
-never sets source or output, so applying one won't clobber where you're rendering
-from or to.
+Built-in presets ship as presets.json inside this package -- anchored at the
+package (not PROJECT_ROOT) so they survive a DATAMOSH_HOME relocation and a
+plain wheel install alike. Presets you save from the UI go to
+output/user_presets.json so the shipped file is never touched. A preset is just
+a dict of MoshConfig field names -> values; it never sets source or output, so
+applying one won't clobber where you're rendering from or to.
 """
 
 import json
+from pathlib import Path
 
 from . import paths
 from .config import MoshConfig, from_mapping
 
-BUILTIN_FILE = paths.PROJECT_ROOT / "presets.json"
+BUILTIN_FILE = Path(__file__).with_name("presets.json")
 USER_FILE = paths.OUTPUT_DIR / "user_presets.json"
 
 

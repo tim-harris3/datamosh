@@ -53,6 +53,9 @@ python -m datamosh.sample        # writes media/sample.avi
 datamosh-ui        # or: python app.py
 ```
 
+Prefer a native window over a browser tab? Install the `[window]` extra
+(`pip install -e ".[window,dev]"`) and run `datamosh-ui --window`.
+
 **Command line** (every knob is a flag; `--help` lists them all):
 
 ```sh
@@ -103,7 +106,6 @@ docs/           deeper docs: how the core works, how to write recipes
 tests/          pytest suite (fixtures are generated -- no media in the repo)
 app.py          `python app.py` shim for the UI (same as datamosh-ui)
 mosh.py         `python mosh.py` shim for the CLI (same as datamosh)
-presets.json    named settings bundles (used by the UI and --preset)
 media/          put source videos here (gitignored)
 output/         every render, preview, and cache lands here (gitignored)
 ```

@@ -5,7 +5,8 @@
     rendering.py  the Mosh click: run_mosh + post-effects + preview + history
     layout.py     the gr.Blocks tree and event wiring
     static/       the keyframe-grid / drag-timeline frontend (html/css/js)
-    app.py        the entry point (`datamosh-ui`): calls layout.build_ui().launch()
+    app.py        the entry point (`datamosh-ui`): launch() in the browser, or
+                  --window for a native pywebview window (the [window] extra)
 
 Needs the [ui] extra (gradio):  pip install datamosh[ui]
 """

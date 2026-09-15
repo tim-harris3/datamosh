@@ -29,6 +29,9 @@ classifiers = [
 
 [project.optional-dependencies]
 ui = ["gradio>=6.24"]
+# gradio listed directly (not via datamosh[ui]): self-referential extras are
+# silently dropped by pre-21.3 pip. Keep the pin in sync with [ui] above.
+window = ["gradio>=6.24", "pywebview>=5.1"]
 dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
@@ -44,6 +47,7 @@ Issues = "https://github.com/tim-harris3/moshing/issues"
 packages = ["datamosh", "datamosh.ui"]
 
 [tool.setuptools.package-data]
+datamosh = ["presets.json"]
 "datamosh.ui" = ["static/*"]
 
 [tool.pytest.ini_options]

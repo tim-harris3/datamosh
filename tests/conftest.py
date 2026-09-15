@@ -4,11 +4,19 @@ Everything is generated with ffmpeg's pattern sources at session start -- no med
 files live in the repo. Tests that need ffmpeg skip cleanly when it is missing.
 """
 
+import os
 import random
 import shutil
 import subprocess
 
 import pytest
+
+# paths.py bakes DATAMOSH_HOME into module constants at import time, so a
+# machine-wide value (the desktop installer sets one) would point the whole
+# suite at the user's live tree -- and a fixture couldn't undo it after the
+# fact. Drop it here, before anything imports datamosh. The relocation branch
+# itself is covered by tests/test_paths.py in a subprocess.
+os.environ.pop("DATAMOSH_HOME", None)
 
 HAVE_FFMPEG = shutil.which("ffmpeg") and shutil.which("ffprobe")
 
