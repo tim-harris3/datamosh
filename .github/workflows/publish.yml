@@ -1,8 +1,9 @@
 name: Publish
 
 # Publishes to PyPI via trusted publishing (OIDC, no API token) when a GitHub
-# release is published. workflow_dispatch is there to re-run a failed publish
-# without cutting a new release.
+# release is published, and builds the Windows installer and attaches it to
+# the release. workflow_dispatch is there to re-run a failed publish without
+# cutting a new release (the installer is then only uploaded as an artifact).
 on:
   release:
     types: [published]
@@ -36,3 +37,77 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  # Freezes the desktop app (PyInstaller) and compiles the Inno Setup
+  # installer, bundling a pinned GPL ffmpeg so the result is self-contained.
+  # Independent of the PyPI jobs: a hiccup in one shouldn't block the other.
+  windows-installer:
+    runs-on: windows-latest
+    permissions:
+      contents: write # gh release upload
+    env:
+      # Pinned BtbN/FFmpeg-Builds release. Must be the static win64-gpl
+      # variant: the app needs libx264 (previews) and libxvid (xvid encoder),
+      # which LGPL and "essentials"-style builds lack. Bump all three
+      # together; the new hash is in the release's checksums.sha256.
+      FFMPEG_TAG: autobuild-2026-09-15-13-18
+      FFMPEG_ASSET: ffmpeg-n9.0.1-30-g9258bacca5-win64-gpl-9.0.zip
+      FFMPEG_SHA256: f5ab48026a847851639ac804d8768c7098ea4ba8350cb09578dd5c616e4acfda
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install app and freeze dependencies
+        run: pip install ".[ui,window]" pyinstaller
+      - name: Fetch pinned GPL ffmpeg
+        shell: pwsh
+        run: |
+          curl.exe -L --retry 3 --fail -o ffmpeg.zip "https://github.com/BtbN/FFmpeg-Builds/releases/download/$env:FFMPEG_TAG/$env:FFMPEG_ASSET"
+          $hash = (Get-FileHash ffmpeg.zip -Algorithm SHA256).Hash
+          if ($hash -ne $env:FFMPEG_SHA256) { throw "ffmpeg.zip checksum mismatch: got $hash" }
+          Expand-Archive ffmpeg.zip ffmpeg-tmp
+          $dir = (Get-ChildItem ffmpeg-tmp -Directory | Select-Object -First 1).FullName
+          New-Item -ItemType Directory packaging\ffmpeg-bin | Out-Null
+          # Only ffmpeg + ffprobe -- the spec globs every exe in ffmpeg-bin,
+          # and ffplay would be ~100 MB of dead weight in the installer.
+          Copy-Item "$dir\bin\ffmpeg.exe", "$dir\bin\ffprobe.exe" packaging\ffmpeg-bin\
+          Copy-Item "$dir\LICENSE.txt" packaging\ffmpeg-bin\FFMPEG_LICENSE.txt
+      - name: Verify bundled ffmpeg has the required encoders
+        shell: pwsh
+        run: |
+          $enc = & packaging\ffmpeg-bin\ffmpeg.exe -hide_banner -encoders
+          foreach ($e in "libx264", "libxvid") {
+            if (-not ($enc | Select-String " $e ")) { throw "bundled ffmpeg lacks $e" }
+          }
+      - name: Build frozen app and installer
+        shell: pwsh
+        run: .\packaging\build.ps1 -Installer
+      - name: Smoke-check dist
+        shell: pwsh
+        run: |
+          $app = "dist\datamosh"
+          foreach ($f in "$app\datamosh.exe",
+                         "$app\_internal\ffmpeg\ffmpeg.exe",
+                         "$app\_internal\ffmpeg\ffprobe.exe",
+                         "$app\_internal\ffmpeg\FFMPEG_LICENSE.txt",
+                         "$app\_internal\datamosh\presets.json") {
+            if (-not (Test-Path $f)) { throw "missing from dist: $f" }
+          }
+          & "$app\_internal\ffmpeg\ffmpeg.exe" -version | Select-Object -First 1
+          if ($LASTEXITCODE -ne 0) { throw "bundled ffmpeg.exe does not run" }
+          $version = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          $setup = "dist\installer\datamosh-setup-$version.exe"
+          if (-not (Test-Path $setup)) { throw "missing installer: $setup" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/installer/*.exe
+      - name: Attach installer to the release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $setup = (Get-Item dist\installer\*.exe).FullName
+          gh release upload "${{ github.event.release.tag_name }}" $setup --clobber

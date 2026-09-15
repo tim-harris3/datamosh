@@ -20,6 +20,19 @@ Three ways to use it, from easiest to most flexible:
 2. **Recipes** — small scripts you copy and tweak (see [recipes/README.md](recipes/README.md)).
 3. **The `datamosh` package** — import the core functions and build your own pipelines.
 
+## Windows: just download the app
+
+Grab `datamosh-setup-<version>.exe` from the
+[latest release](https://github.com/tim-harris3/datamosh/releases/latest) and
+run it — no Python, no ffmpeg (a GPL build is bundled, license included), no
+admin rights (it installs per-user). Renders, media, and presets live in
+`Videos\datamosh`.
+
+The installer isn't code-signed yet, so SmartScreen may warn on first run —
+click **More info → Run anyway**.
+
+Everything below is for the CLI, the library, and other operating systems.
+
 ## Setup (once)
 
 Requirements: Python 3.10+, and [ffmpeg](https://ffmpeg.org/download.html) on your PATH:
