@@ -94,8 +94,12 @@ jobs:
                          "$app\_internal\datamosh\presets.json") {
             if (-not (Test-Path $f)) { throw "missing from dist: $f" }
           }
-          & "$app\_internal\ffmpeg\ffmpeg.exe" -version | Select-Object -First 1
+          # Capture fully before printing: piping straight into Select-Object
+          # -First would stop the pipeline and kill ffmpeg mid-run, clobbering
+          # its exit code.
+          $v = & "$app\_internal\ffmpeg\ffmpeg.exe" -version
           if ($LASTEXITCODE -ne 0) { throw "bundled ffmpeg.exe does not run" }
+          $v | Select-Object -First 1
           $version = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
           $setup = "dist\installer\datamosh-setup-$version.exe"
           if (-not (Test-Path $setup)) { throw "missing installer: $setup" }
