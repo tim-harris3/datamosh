@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-from datamosh import enable_console_logging, ffmpeg
+from datamosh import enable_console_logging, ffmpeg, paths
 
 ICON = Path(__file__).parent / "static" / "datamosh.ico"
 
@@ -33,10 +33,14 @@ def main():
     from . import layout, media  # deferred: importing gradio is slow
 
     demo = layout.build_ui()
+    # gradio only serves files under allowed_paths (or the cwd). In the
+    # installed app OUTPUT_DIR lives under DATAMOSH_HOME, far from the exe's
+    # cwd, so previews are rejected without it listed explicitly.
+    allowed_paths = [media.THUMBS_ROOT, str(paths.OUTPUT_DIR)]
     if args.window:
-        _run_windowed(demo, allowed_paths=[media.THUMBS_ROOT])
+        _run_windowed(demo, allowed_paths=allowed_paths)
     else:
-        demo.launch(allowed_paths=[media.THUMBS_ROOT])
+        demo.launch(allowed_paths=allowed_paths)
 
 
 def _run_windowed(demo, allowed_paths):
