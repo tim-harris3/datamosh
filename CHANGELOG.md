@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — 2026-09-15
+
+- Fix: the packaged desktop app rejected render previews with gradio's
+  `InvalidPathError` — `OUTPUT_DIR` lives under `DATAMOSH_HOME`, outside the
+  exe's cwd, so it must be listed in `launch(allowed_paths=...)` explicitly.
+  Renders themselves were unaffected.
+
 ## 0.1.0 — 2026-09-15
 
 First public release.
