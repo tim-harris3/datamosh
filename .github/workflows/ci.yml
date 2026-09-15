@@ -19,7 +19,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      # setup-ffmpeg has no arm64 macOS build (macos-latest runners are
+      # Apple Silicon), so macOS gets ffmpeg from Homebrew instead
+      - name: Install ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
       - name: Install ffmpeg
+        if: runner.os != 'macOS'
         uses: federicocarboni/setup-ffmpeg@v3
       - name: Install package
         run: pip install -e ".[dev]"
