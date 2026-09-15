@@ -1,11 +1,6 @@
 # datamosh
 
-A programmatic datamoshing toolkit. It mangles video at the raw AVI byte level —
-duplicated P-frames, deleted keyframes, reordered motion, corrupted macroblocks,
-loop-stretched audio — with no decoding in the mosh path, and it is built around
-one idea most moshing tools don't have: **determinism**. Every render is seeded,
-and a `MoshScript` is a JSON-serializable glitch timeline that reproduces
-byte-identically — you can save, share, and re-run the exact same mosh.
+A programmatic datamoshing toolkit. It changes video at the raw AVI byte level without decoding: duplicated P-frames, deleted keyframes, reordered motion, corrupted macroblocks, and loop-stretched audio. Additional decode-required chroma subsampling and pixel sorting effects take a moshable .AVI as input and output, enabling them to be inserted anywhere in the chain. Effects are based on *seeded*, *tunable* randomness: a mosh run with identical inputs and the same seed will produce byte-identical results.
 
 <p align="center">
   <img src="docs/assets/melt.gif" width="32%" alt="Tree canopy dissolving into blocky confetti">
@@ -20,7 +15,7 @@ Three ways to use it, from easiest to most flexible:
 2. **Recipes** — small scripts you copy and tweak (see [recipes/README.md](recipes/README.md)).
 3. **The `datamosh` package** — import the core functions and build your own pipelines.
 
-## Windows: just download the app
+## For people who aren't smelly nerds and just want the .exe
 
 Grab `datamosh-setup-<version>.exe` from the
 [latest release](https://github.com/tim-harris3/datamosh/releases/latest) and
@@ -56,24 +51,21 @@ python3 -m venv .venv
 ```
 
 `[ui]` pulls in Gradio for the browser UI; leave it off for the library/CLI only.
-No footage handy? Generate a copyright-free demo clip to mosh:
-
-```sh
-python -m datamosh.sample        # writes media/sample.avi
-```
 
 ## Use
 
 (Activate the venv first — `.venv\Scripts\activate` on Windows,
 `source .venv/bin/activate` elsewhere — or prefix commands with the venv path.)
 
-**Browser UI** — then open http://127.0.0.1:7860:
+**Browser UI**
 
 ```sh
 datamosh-ui        # or: python app.py
 ```
 
-Prefer a native window over a browser tab? Install the `[window]` extra
+then open <http://127.0.0.1:7860>:
+
+To run in a native window instead of a browser tab install the `[window]` extra
 (`pip install -e ".[window,dev]"`) and run `datamosh-ui --window`.
 
 **Command line** (every knob is a flag; `--help` lists them all):
@@ -81,7 +73,6 @@ Prefer a native window over a browser tab? Install the `[window]` extra
 ```sh
 datamosh --source media/sample.avi --n 10 --seed 5
 datamosh --preset "heavy bloom" --source media/sample.avi
-datamosh --source media/sample.avi --encoder xvid   # classic Xvid look (full ffmpeg builds)
 ```
 
 Two extra verbs close the scripting loop: `prepare` pre-encodes a moshable AVI
@@ -95,7 +86,7 @@ datamosh inspect output/sample_moshable.avi          # add --json for machines
 
 **Sharing your mosh** — moshed AVIs confuse most players, so `export` turns one
 into an mp4, webm, or gif. It decodes the corrupt bytes directly: the export is
-a faithful recording of how ffmpeg plays the glitch.
+a faithful recording of how ffmpeg plays the glitches.
 
 ```sh
 datamosh export output/run.avi                       # mp4 next to the source
